@@ -75,14 +75,16 @@ const Router = (() => {
       updatingHash = false;
     }
 
-    // Render page
+    // Render page (with skeleton transition)
     const container = document.getElementById('page-container');
     const div = document.createElement('div');
-    div.className = 'page';
+    div.className = 'page page-entering';
     div.innerHTML = renderFn();
     container.innerHTML = '';
     container.appendChild(div);
     if (renderFn.afterRender) renderFn.afterRender();
+    // Remove animation class after it completes
+    div.addEventListener('animationend', () => div.classList.remove('page-entering'), { once: true });
 
     // Update topbar breadcrumb + action
     updateBreadcrumb(id, info);

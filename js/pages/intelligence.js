@@ -205,12 +205,16 @@ intelRenderFn.afterRender = () => {
   document.querySelectorAll('.intel-tab[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       intelTab = btn.dataset.tab;
-      // Re-render the entire page content (tabs + content)
+      // Show skeleton briefly, then render real content
       const container = document.getElementById('page-container');
       const div = container.querySelector('.page');
       if (div) {
-        div.innerHTML = renderIntelHub();
-        intelRenderFn.afterRender();
+        const tabContent = document.getElementById('intel-tab-content');
+        if (tabContent) tabContent.innerHTML = UI.skelTable(4, 5);
+        setTimeout(() => {
+          div.innerHTML = renderIntelHub();
+          intelRenderFn.afterRender();
+        }, 80);
       }
     });
   });
