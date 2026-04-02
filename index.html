@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Synapse — Customer Intelligence Platform</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">S</div>
+      <span class="logo-text">Synapse</span>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-item active" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</div>
+      <div class="nav-item" data-page="sync"><span class="nav-icon">⟳</span> Data Sync</div>
+      <div class="nav-item" data-page="documents"><span class="nav-icon">⊟</span> Documents</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Intelligence</div>
+      <div class="nav-item" data-page="today"><span class="nav-icon">◉</span> Today's Insight</div>
+      <div class="nav-item" data-page="intel-overview"><span class="nav-icon">◫</span> Overview</div>
+      <div class="nav-item" data-page="trending"><span class="nav-icon">⬆</span> Trending Issues <span class="nav-badge yellow">3</span></div>
+      <div class="nav-item" data-page="pressing"><span class="nav-icon">⚑</span> Pressing Now <span class="nav-badge">12</span></div>
+      <div class="nav-item" data-page="health"><span class="nav-icon">♡</span> Customer Health</div>
+      <div class="nav-item" data-page="quality"><span class="nav-icon">◎</span> Quality Assurance</div>
+      <div class="nav-item" data-page="analyses"><span class="nav-icon">⊕</span> AI Analyses</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">QA Scoring</div>
+      <div class="nav-item" data-page="qa-summary"><span class="nav-icon">▣</span> QA Summary</div>
+      <div class="nav-item" data-page="churn-risk"><span class="nav-icon">△</span> Churn Risk <span class="nav-badge">7</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Mastermind</div>
+      <div class="nav-item" data-page="mastermind-search"><span class="nav-icon">◌</span> Search</div>
+      <div class="nav-item" data-page="mastermind-chat"><span class="nav-icon">◻</span> Chat</div>
+      <div class="nav-item" data-page="mastermind-articles"><span class="nav-icon">⊞</span> Articles</div>
+      <div class="nav-item" data-page="mastermind-agents"><span class="nav-icon">⊙</span> Agents</div>
+      <div class="nav-item" data-page="mastermind-settings"><span class="nav-icon">⚙</span> Settings</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Auto-Responder</div>
+      <div class="nav-item" data-page="ar-dashboard"><span class="nav-icon">◈</span> Dashboard</div>
+      <div class="nav-item" data-page="ar-drafts"><span class="nav-icon">⊟</span> Draft Queue <span class="nav-badge green">5</span></div>
+      <div class="nav-item" data-page="ar-config"><span class="nav-icon">⊞</span> Configuration</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Analytics</div>
+      <div class="nav-item" data-page="stats-freshdesk"><span class="nav-icon">◫</span> Freshdesk</div>
+      <div class="nav-item" data-page="stats-jira"><span class="nav-icon">◎</span> Jira</div>
+      <div class="nav-item" data-page="stats-attachments"><span class="nav-icon">⊕</span> Attachments</div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main id="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <span class="topbar-tag" id="topbar-tag">/</span>
+      <button class="sync-btn" id="topbar-sync-btn">⟳ Sync Now</button>
+    </div>
+    <div id="page-container"></div>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/pages/dashboard.js"></script>
+  <script src="js/pages/sync.js"></script>
+  <script src="js/pages/documents.js"></script>
+  <script src="js/pages/intelligence.js"></script>
+  <script src="js/pages/qa.js"></script>
+  <script src="js/pages/mastermind.js"></script>
+  <script src="js/pages/autoresponder.js"></script>
+  <script src="js/pages/analytics.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
