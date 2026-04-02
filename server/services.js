@@ -7,6 +7,38 @@
 const freshdesk = require('./freshdesk');
 const cache = require('./cache');
 
+// ── GROUP FILTER ──
+// When set, all ticket/agent queries are scoped to this group.
+let _activeGroupId = null;
+
+function setGroupFilter(groupId) { _activeGroupId = groupId; }
+function getGroupFilter() { return _activeGroupId; }
+
+/** Fetch tickets with automatic group_id filter applied. */
+async function fetchTickets(opts = {}) {
+  const gid = getGroupFilter();
+  if (gid) {
+    // Freshdesk filter syntax: pre-defined filters or custom query
+    // We filter client-side since listTickets may not support group_id in filter param
+    const tickets = await fetchTickets(opts);
+    return tickets.filter(t => t.group_id === gid);
+  }
+  return fetchTickets(opts);
+}
+
+/** Filter an agents array to only those belonging to the active group. */
+function filterAgentsByGroup(agents) {
+  const gid = getGroupFilter();
+  if (!gid) return agents;
+  return agents.filter(a => (a.group_ids || []).includes(gid));
+}
+
+/** Cache key suffix for group-scoped caching. */
+function gk(base) {
+  const gid = getGroupFilter();
+  return gid ? `${base}:g${gid}` : base;
+}
+
 // ── TTL (seconds) ──
 const TTL = {
   short:  5 * 60,   // 5 min  — frequently changing data
@@ -52,8 +84,8 @@ async function cached(key, ttl, fetchFn) {
  * Tickets by status, priority, SLA breaches, avg response time.
  */
 async function getDashboardStats() {
-  return cached('svc:dashboard-stats', TTL.short, async () => {
-    const tickets = await freshdesk.listTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' });
+  return cached(gk('svc:dashboard-stats'), TTL.short, async () => {
+    const tickets = await fetchTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' });
     const now = Date.now();
 
     const byStatus = { open: 0, pending: 0, resolved: 0, closed: 0 };
@@ -107,13 +139,13 @@ async function getDashboardStats() {
  * This week vs last week ticket stats for time comparison.
  */
 async function getDashboardComparison() {
-  return cached('svc:dashboard-comparison', TTL.short, async () => {
+  return cached(gk('svc:dashboard-comparison'), TTL.short, async () => {
     const now = new Date();
     const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfLastWeek = new Date(startOfWeek); startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
 
-    const tickets = await freshdesk.listTickets({
+    const tickets = await fetchTickets({
       updated_since: startOfLastWeek.toISOString(),
       include: 'stats',
       order_by: 'created_at',
@@ -157,8 +189,8 @@ async function getDashboardComparison() {
  * Open tickets >24h, SLA at-risk, churn signals by company.
  */
 async function getActionableInsights() {
-  return cached('svc:actionable-insights', TTL.short, async () => {
-    const tickets = await freshdesk.listTickets({ include: 'stats,company', order_by: 'created_at', order_type: 'desc' });
+  return cached(gk('svc:actionable-insights'), TTL.short, async () => {
+    const tickets = await fetchTickets({ include: 'stats,company', order_by: 'created_at', order_type: 'desc' });
     const now = Date.now();
     const h24 = 24 * 3600000;
 
@@ -238,10 +270,10 @@ async function getActionableInsights() {
  * Today's tickets aggregated by tag, type, and group.
  */
 async function getTodaysIssues() {
-  return cached('svc:todays-issues', TTL.short, async () => {
+  return cached(gk('svc:todays-issues'), TTL.short, async () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tickets = await freshdesk.listTickets({
+    const tickets = await fetchTickets({
       updated_since: today.toISOString(),
       include: 'stats',
       order_by: 'created_at',
@@ -297,9 +329,9 @@ async function getTodaysIssues() {
  * Ticket volume per day for the last N days.
  */
 async function getTicketTrends(days = 30) {
-  return cached(`svc:ticket-trends:${days}`, TTL.short, async () => {
+  return cached(gk(`svc:ticket-trends:${days}`), TTL.short, async () => {
     const since = new Date(Date.now() - days * 86400000).toISOString();
-    const tickets = await freshdesk.listTickets({ updated_since: since, order_by: 'created_at', order_type: 'asc' });
+    const tickets = await fetchTickets({ updated_since: since, order_by: 'created_at', order_type: 'asc' });
 
     // Bucket by date
     const buckets = {};
@@ -323,8 +355,8 @@ async function getTicketTrends(days = 30) {
  * Most frequent tags and ticket types.
  */
 async function getTopIssues() {
-  return cached('svc:top-issues', TTL.short, async () => {
-    const tickets = await freshdesk.listTickets({ order_by: 'created_at', order_type: 'desc' });
+  return cached(gk('svc:top-issues'), TTL.short, async () => {
+    const tickets = await fetchTickets({ order_by: 'created_at', order_type: 'desc' });
 
     const tagCounts = {};
     const typeCounts = {};
@@ -355,11 +387,12 @@ async function getTopIssues() {
  * Resolved count and avg first response time per agent.
  */
 async function getAgentPerformance() {
-  return cached('svc:agent-performance', TTL.medium, async () => {
-    const [agents, tickets] = await Promise.all([
+  return cached(gk('svc:agent-performance'), TTL.medium, async () => {
+    const [allAgents, tickets] = await Promise.all([
       freshdesk.listAgents(),
-      freshdesk.listTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' }),
+      fetchTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' }),
     ]);
+    const agents = filterAgentsByGroup(allAgents);
 
     const agentMap = {};
     for (const a of agents) {
@@ -397,10 +430,10 @@ async function getAgentPerformance() {
  * Same metrics per group.
  */
 async function getGroupPerformance() {
-  return cached('svc:group-performance', TTL.medium, async () => {
+  return cached(gk('svc:group-performance'), TTL.medium, async () => {
     const [groups, tickets] = await Promise.all([
       freshdesk.listGroups(),
-      freshdesk.listTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' }),
+      fetchTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' }),
     ]);
 
     const groupMap = {};
@@ -437,11 +470,12 @@ async function getGroupPerformance() {
  * Full agent list with group names and availability status.
  */
 async function getAgentList() {
-  return cached('svc:agent-list', TTL.long, async () => {
-    const [agents, groups] = await Promise.all([
+  return cached(gk('svc:agent-list'), TTL.long, async () => {
+    const [allAgents, groups] = await Promise.all([
       freshdesk.listAgents(),
       freshdesk.listGroups(),
     ]);
+    const agents = filterAgentsByGroup(allAgents);
 
     const groupNames = {};
     for (const g of groups) groupNames[g.id] = g.name;
@@ -474,9 +508,9 @@ async function getAgentList() {
  * CSAT ratings grouped by agent.
  */
 async function getCSATByAgent() {
-  return cached('svc:csat-by-agent', TTL.medium, async () => {
+  return cached(gk('svc:csat-by-agent'), TTL.medium, async () => {
     // Get recent resolved tickets with responder info
-    const tickets = await freshdesk.listTickets({ include: 'stats', order_by: 'updated_at', order_type: 'desc' });
+    const tickets = await fetchTickets({ include: 'stats', order_by: 'updated_at', order_type: 'desc' });
     const resolved = tickets.filter(t => (t.status === 4 || t.status === 5) && t.responder_id);
 
     // Fetch CSAT for a sample of resolved tickets (limit API calls)
@@ -501,19 +535,23 @@ async function getCSATByAgent() {
       }
     }
 
-    // Get agent names
-    const agents = await freshdesk.listAgents();
+    // Get agent names (filtered by group)
+    const allAgents = await freshdesk.listAgents();
+    const agents = filterAgentsByGroup(allAgents);
     const nameMap = {};
+    const agentIds = new Set();
     for (const a of agents) {
-      if (a.contact?.name) nameMap[a.id] = a.contact.name;
+      if (a.contact?.name) { nameMap[a.id] = a.contact.name; agentIds.add(a.id); }
     }
 
-    const result = Object.entries(agentRatings).map(([agentId, r]) => ({
-      agent_id: parseInt(agentId),
-      agent_name: nameMap[agentId] || `Agent #${agentId}`,
-      ...r,
-      satisfaction_pct: r.total > 0 ? Math.round((r.happy / r.total) * 100) : null,
-    })).sort((a, b) => (b.satisfaction_pct || 0) - (a.satisfaction_pct || 0));
+    const result = Object.entries(agentRatings)
+      .filter(([agentId]) => agentIds.size === 0 || agentIds.has(parseInt(agentId)))
+      .map(([agentId, r]) => ({
+        agent_id: parseInt(agentId),
+        agent_name: nameMap[agentId] || `Agent #${agentId}`,
+        ...r,
+        satisfaction_pct: r.total > 0 ? Math.round((r.happy / r.total) * 100) : null,
+      })).sort((a, b) => (b.satisfaction_pct || 0) - (a.satisfaction_pct || 0));
 
     return { agents: result, sample_size: sample.length };
   });
@@ -524,8 +562,8 @@ async function getCSATByAgent() {
  * Low CSAT tickets + their conversations.
  */
 async function getWorstScoredTickets() {
-  return cached('svc:worst-scored', TTL.medium, async () => {
-    const tickets = await freshdesk.listTickets({ include: 'stats', order_by: 'updated_at', order_type: 'desc' });
+  return cached(gk('svc:worst-scored'), TTL.medium, async () => {
+    const tickets = await fetchTickets({ include: 'stats', order_by: 'updated_at', order_type: 'desc' });
     const resolved = tickets.filter(t => (t.status === 4 || t.status === 5)).slice(0, 30);
 
     const worst = [];
@@ -575,8 +613,8 @@ async function getWorstScoredTickets() {
  * Open tickets with no first reply yet — candidates for auto-response.
  */
 async function getDraftQueue() {
-  return cached('svc:draft-queue', TTL.short, async () => {
-    const tickets = await freshdesk.listTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' });
+  return cached(gk('svc:draft-queue'), TTL.short, async () => {
+    const tickets = await fetchTickets({ include: 'stats', order_by: 'created_at', order_type: 'desc' });
 
     const noReply = tickets
       .filter(t => t.status === 2 && (!t.stats || !t.stats.first_responded_at))
@@ -606,10 +644,10 @@ async function getDraftQueue() {
  * Companies with health_score + open ticket count.
  */
 async function getCompanyHealth() {
-  return cached('svc:company-health', TTL.medium, async () => {
+  return cached(gk('svc:company-health'), TTL.medium, async () => {
     const [companies, tickets] = await Promise.all([
       freshdesk.listCompanies(),
-      freshdesk.listTickets({ order_by: 'created_at', order_type: 'desc' }),
+      fetchTickets({ order_by: 'created_at', order_type: 'desc' }),
     ]);
 
     const openByCompany = {};
@@ -643,7 +681,7 @@ async function getCompanyHealth() {
  * All contacts for a given company.
  */
 async function getContactsByCompany(companyId) {
-  return cached(`svc:contacts-by-company:${companyId}`, TTL.medium, async () => {
+  return cached(gk(`svc:contacts-by-company:${companyId}`), TTL.medium, async () => {
     const contacts = await freshdesk.paginate(`/companies/${companyId}/contacts`);
     return {
       contacts: contacts.map(c => ({
@@ -664,7 +702,7 @@ async function getContactsByCompany(companyId) {
  * All tickets for a given contact (requester).
  */
 async function getTicketsByContact(contactId) {
-  return cached(`svc:tickets-by-contact:${contactId}`, TTL.short, async () => {
+  return cached(gk(`svc:tickets-by-contact:${contactId}`), TTL.short, async () => {
     const data = await freshdesk.searchTickets(`requester_id:${contactId}`);
     return {
       tickets: (data.results || []).map(t => ({
@@ -689,7 +727,7 @@ async function getTicketsByContact(contactId) {
  * Single ticket + requester + stats + conversations.
  */
 async function getTicketDetail(id) {
-  return cached(`svc:ticket-detail:${id}`, 2 * 60, async () => {
+  return cached(gk(`svc:ticket-detail:${id}`), 2 * 60, async () => {
     const [ticket, conversations] = await Promise.all([
       freshdesk.getTicket(id, 'requester,stats,company'),
       freshdesk.getConversations(id),
@@ -732,7 +770,7 @@ async function getTicketDetail(id) {
  * All tickets assigned to an agent.
  */
 async function getAgentTickets(agentId) {
-  return cached(`svc:agent-tickets:${agentId}`, TTL.short, async () => {
+  return cached(gk(`svc:agent-tickets:${agentId}`), TTL.short, async () => {
     const data = await freshdesk.searchTickets(`responder_id:${agentId}`);
     const tickets = (data.results || []).map(t => ({
       id: t.id,
@@ -765,4 +803,6 @@ module.exports = {
   getCompanyHealth, getContactsByCompany, getTicketsByContact,
   // Drill-down
   getTicketDetail, getAgentTickets,
+  // Group filter
+  setGroupFilter, getGroupFilter,
 };

@@ -114,4 +114,11 @@ function list() {
     .filter(Boolean);
 }
 
-module.exports = { get, getWithMeta, set, clear, list };
+function clearAll() {
+  ensureDir();
+  for (const f of fs.readdirSync(CACHE_DIR).filter(f => f.endsWith('.json'))) {
+    try { fs.unlinkSync(path.join(CACHE_DIR, f)); } catch {}
+  }
+}
+
+module.exports = { get, getWithMeta, set, clear, clearAll, list };
