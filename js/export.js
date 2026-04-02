@@ -2,14 +2,18 @@
  * export.js — Export engine for Synapse
  *
  * Extends the UI object with:
- *   - CSV export (any data array or table)
- *   - JSON export (complex nested data)
+ *   - CSV export with date range metadata + filename suffix
+ *   - JSON export with date range metadata
+ *   - Print helper with date range in header
  *   - Export dropdown component (HTML + wiring)
- *   - Print helper (sets print metadata, calls window.print)
  *   - Table-aware export (reads filtered/sorted state)
+ *   - Full report export (multi-section CSV)
+ *
+ * All exports automatically include the active date range from the
+ * topbar DateRange picker when set.
  *
  * Role-gated: export buttons only render for manager/admin.
- * Loaded after components.js and auth.js.
+ * Loaded after components.js, auth.js, and data.js (for DateRange).
  */
 
 (() => {
@@ -21,6 +25,24 @@
     return d.getFullYear() + '-' +
       String(d.getMonth() + 1).padStart(2, '0') + '-' +
       String(d.getDate()).padStart(2, '0');
+  }
+
+  /** Build filename suffix including date range if active. */
+  function fileSuffix() {
+    const range = typeof DateRange !== 'undefined' ? DateRange.get() : {};
+    if (range.from && range.to) {
+      return `${range.from}_to_${range.to}`;
+    }
+    return exportDate();
+  }
+
+  /** Human-readable date range string, or "All time". */
+  function rangeLabel() {
+    const range = typeof DateRange !== 'undefined' ? DateRange.get() : {};
+    if (range.from && range.to) return `${range.from} to ${range.to}`;
+    if (range.from) return `From ${range.from}`;
+    if (range.to) return `Until ${range.to}`;
+    return 'All time';
   }
 
   function stripHTML(str) {
@@ -47,26 +69,48 @@
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
   }
 
-  // ── CSV EXPORT ──
+  // ── CSV EXPORT (with date range metadata) ──
 
   UI.exportCSV = function(data, columns, filenameBase) {
     if (!data || !data.length) return;
-    const header = columns.map(c => escapeCSV(c.label)).join(',');
-    const rows = data.map(row =>
-      columns.map(c => escapeCSV(row[c.key])).join(',')
-    );
-    const csv = '\uFEFF' + header + '\r\n' + rows.join('\r\n');
+
+    const lines = [];
+    // Metadata header
+    lines.push(`# Synapse Report: ${filenameBase}`);
+    lines.push(`# Exported: ${new Date().toLocaleString()}`);
+    lines.push(`# Date Range: ${rangeLabel()}`);
+    lines.push(`# Rows: ${data.length}`);
+    lines.push('');
+
+    // Column header
+    lines.push(columns.map(c => escapeCSV(c.label)).join(','));
+
+    // Data rows
+    for (const row of data) {
+      lines.push(columns.map(c => escapeCSV(row[c.key])).join(','));
+    }
+
+    const csv = '\uFEFF' + lines.join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    downloadBlob(blob, `synapse_${filenameBase}_${exportDate()}.csv`);
+    downloadBlob(blob, `synapse_${filenameBase}_${fileSuffix()}.csv`);
   };
 
-  // ── JSON EXPORT ──
+  // ── JSON EXPORT (with date range metadata) ──
 
   UI.exportJSON = function(data, filenameBase) {
     if (!data) return;
-    const json = JSON.stringify(data, null, 2);
+    const envelope = {
+      _meta: {
+        report: filenameBase,
+        exported: new Date().toISOString(),
+        dateRange: rangeLabel(),
+        rows: Array.isArray(data) ? data.length : 1,
+      },
+      data,
+    };
+    const json = JSON.stringify(envelope, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
-    downloadBlob(blob, `synapse_${filenameBase}_${exportDate()}.json`);
+    downloadBlob(blob, `synapse_${filenameBase}_${fileSuffix()}.json`);
   };
 
   // ── TABLE-AWARE CSV EXPORT ──
@@ -80,15 +124,97 @@
     UI.exportCSV(data, columns, filenameBase);
   };
 
-  // ── PRINT HELPER ──
+  // ── PRINT HELPER (with date range in header) ──
 
   UI.printPage = function(title) {
     const container = document.getElementById('page-container');
     if (container) {
       container.setAttribute('data-print-title', title || 'Report');
       container.setAttribute('data-print-date', exportDate());
+      container.setAttribute('data-print-range', rangeLabel());
     }
     window.print();
+  };
+
+  // ── FULL REPORT EXPORT (multi-section CSV) ──
+
+  UI.exportFullReport = function() {
+    const lines = [];
+    const range = rangeLabel();
+
+    lines.push('# ═══════════════════════════════════════');
+    lines.push('# SYNAPSE FULL REPORT');
+    lines.push(`# Exported: ${new Date().toLocaleString()}`);
+    lines.push(`# Date Range: ${range}`);
+    lines.push('# ═══════════════════════════════════════');
+    lines.push('');
+
+    // Section 1: QA Agent Scores
+    lines.push('# ── QA AGENT SCORES ──');
+    lines.push('Agent,Tickets,Avg Score,Flags');
+    for (const a of (DATA.qaAgents || [])) {
+      lines.push([escapeCSV(a.name), a.tickets, a.score, a.flags].join(','));
+    }
+    lines.push('');
+
+    // Section 2: QA Dimensions
+    lines.push('# ── QA DIMENSIONS ──');
+    lines.push('Dimension,Score (out of 5)');
+    for (const d of (DATA.qaDimensions || [])) {
+      lines.push([escapeCSV(d.label), d.score].join(','));
+    }
+    lines.push('');
+
+    // Section 3: Churn Risk
+    lines.push('# ── CHURN RISK TICKETS ──');
+    lines.push('Ticket,Company,Score,CSAT Est,Signal');
+    for (const t of (DATA.churnTickets || [])) {
+      lines.push([t.id, escapeCSV(t.company), t.score, t.csat, escapeCSV(t.signal)].join(','));
+    }
+    lines.push('');
+
+    // Section 4: Company Health
+    lines.push('# ── COMPANY HEALTH ──');
+    lines.push('Company,Tickets,Resolution Rate,Avg Resolution,Repeats,ARR (NOK),SLA,Status');
+    for (const c of (DATA.accountsUnified || [])) {
+      lines.push([escapeCSV(c.company), c.tickets, c.resRate, c.avgRes, c.repeats, c.arr, c.sla, c.status].join(','));
+    }
+    lines.push('');
+
+    // Section 5: At-Risk Accounts
+    lines.push('# ── AT-RISK ACCOUNTS ──');
+    lines.push('Company,ARR (NOK),Tickets,Repeats,Status');
+    for (const a of (DATA.atRiskAccounts || [])) {
+      lines.push([escapeCSV(a.company), a.arr, a.tickets, a.repeats, a.status].join(','));
+    }
+    lines.push('');
+
+    // Section 6: Priority Queue
+    lines.push('# ── URGENT TICKETS ──');
+    lines.push('Ticket,Subject,Priority,Age,SLA,ARR');
+    for (const t of (DATA.pressingTickets || [])) {
+      lines.push([t.id, escapeCSV(t.title), t.priority, t.age, t.sla, t.arr].join(','));
+    }
+    lines.push('');
+
+    // Section 7: Coaching Summary
+    lines.push('# ── COACHING SUMMARY ──');
+    lines.push('Agent,Score,Previous,Delta,Tickets,Flags');
+    for (const a of (DATA.qaCoaching || [])) {
+      lines.push([escapeCSV(a.name), a.score, a.prevScore, a.score - a.prevScore, a.tickets, a.flags].join(','));
+    }
+    lines.push('');
+
+    // Section 8: Auto-Responder Drafts
+    lines.push('# ── AUTO-RESPONDER DRAFTS ──');
+    lines.push('Ticket,Subject,Confidence,Status');
+    for (const d of (DATA.drafts || [])) {
+      lines.push([d.id, escapeCSV(d.title), d.conf, d.status].join(','));
+    }
+
+    const csv = '\uFEFF' + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    downloadBlob(blob, `synapse_full-report_${fileSuffix()}.csv`);
   };
 
   // ── EXPORT DROPDOWN (HTML generator) ──
@@ -113,7 +239,6 @@
 
     trigger.addEventListener('click', e => {
       e.stopPropagation();
-      // Close any other open dropdowns
       document.querySelectorAll('.export-dd.open').forEach(d => {
         if (d !== dd) d.classList.remove('open');
       });
@@ -130,7 +255,7 @@
     });
   };
 
-  // Close dropdowns on outside click (single global listener)
+  // Close dropdowns on outside click
   document.addEventListener('click', () => {
     document.querySelectorAll('.export-dd.open').forEach(d => d.classList.remove('open'));
   });
@@ -155,7 +280,26 @@
     });
   };
 
-  // ── INJECT DROPDOWN STYLES (avoids a separate CSS file) ──
+  /** Full report export button (for dashboard). */
+  UI.fullReportBtn = function() {
+    if (typeof Auth !== 'undefined' && !Auth.hasRole('manager')) return '';
+    return UI.exportDropdown({
+      id: 'full-report',
+      items: [
+        { label: 'Full Report (CSV)', icon: '\u229E', action: 'csv' },
+        { label: 'Print Page', icon: '\u2399', action: 'print' },
+      ]
+    });
+  };
+
+  UI.fullReportBtnInit = function(printTitle) {
+    UI.exportDropdownInit('full-report', {
+      csv: () => UI.exportFullReport(),
+      print: () => UI.printPage(printTitle || 'Synapse Dashboard'),
+    });
+  };
+
+  // ── INJECT DROPDOWN STYLES ──
 
   const style = document.createElement('style');
   style.textContent = `
@@ -164,7 +308,7 @@
     .export-dd-menu {
       display: none; position: absolute; right: 0; top: 100%; margin-top: 4px;
       background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 6px; min-width: 120px; z-index: 300;
+      border-radius: 6px; min-width: 160px; z-index: 300;
       box-shadow: 0 4px 16px rgba(0,0,0,0.35);
       overflow: hidden;
     }
