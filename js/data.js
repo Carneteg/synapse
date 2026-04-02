@@ -184,4 +184,40 @@ const DATA = {
     { label: 'Other',       count: 292,  pct: 30, color: 'var(--text-muted)' },
   ],
 
+  // ── DASHBOARD KPIs (per time range) ──
+  dashboardKPIs: {
+    today: [
+      { title: 'Open Tickets',    value: '241', delta: '+18',  dir: 'up',   label: 'vs yesterday', color: 'var(--accent)' },
+      { title: 'SLA Compliance',  value: '84%', delta: '-2%',  dir: 'down', label: 'vs yesterday', color: 'var(--yellow)' },
+      { title: 'Churn Signals',   value: '7',   delta: '+1',   dir: 'up',   label: 'vs yesterday', color: 'var(--red)' },
+      { title: 'Drafts Pending',  value: '5',   delta: '+3',   dir: 'up',   label: 'vs yesterday', color: 'var(--green)' },
+    ],
+    week: [
+      { title: 'Open Tickets',    value: '241', delta: '+8%',  dir: 'up',   label: 'vs last week', color: 'var(--accent)' },
+      { title: 'SLA Compliance',  value: '84%', delta: '-3%',  dir: 'down', label: 'vs last week', color: 'var(--yellow)' },
+      { title: 'Churn Signals',   value: '7',   delta: '+2',   dir: 'up',   label: 'vs last week', color: 'var(--red)' },
+      { title: 'Drafts Pending',  value: '5',   delta: 'new',  dir: '',     label: 'awaiting review', color: 'var(--green)' },
+    ],
+    month: [
+      { title: 'Open Tickets',    value: '241', delta: '+12%', dir: 'up',   label: 'vs last month', color: 'var(--accent)' },
+      { title: 'SLA Compliance',  value: '84%', delta: '-5%',  dir: 'down', label: 'vs last month', color: 'var(--yellow)' },
+      { title: 'Churn Signals',   value: '7',   delta: '+4',   dir: 'up',   label: 'vs last month', color: 'var(--red)' },
+      { title: 'Drafts Pending',  value: '5',   delta: '+12',  dir: 'up',   label: 'vs last month', color: 'var(--green)' },
+    ],
+  },
+
+  attentionItems: [
+    { icon: '⚑', text: '12 SLA breaches need response',               badge: 'badge-red',    page: 'pressing' },
+    { icon: '△', text: '7 churn signals — 4.8M NOK at risk',          badge: 'badge-red',    page: 'churn-risk' },
+    { icon: '⊟', text: '5 auto-response drafts awaiting review',       badge: 'badge-green',  page: 'ar-drafts' },
+    { icon: '⬆', text: 'API rate limit +250% this week',              badge: 'badge-yellow', page: 'trending' },
+    { icon: '◎', text: 'QA: Commercial Awareness scored 2.8 / 5',     badge: 'badge-yellow', page: 'qa-summary' },
+  ],
+
+  atRiskAccounts: [
+    { company: 'Acme Corp',      arr: '3.2M', tickets: 18, repeats: 4, status: 'At Risk' },
+    { company: 'Stormcloud Ltd', arr: '2.1M', tickets: 24, repeats: 7, status: 'At Risk' },
+    { company: 'DataPilot GmbH', arr: '1.4M', tickets: 11, repeats: 2, status: 'Watch' },
+  ],
+
 };

@@ -49,6 +49,47 @@
   border-radius: 8px;
 }
 
+/* ── KPI CARD ── */
+.kpi-card { position: relative; }
+.kpi-delta {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; margin-top: 8px;
+  color: var(--text-muted);
+}
+.kpi-delta.up   { color: var(--green); }
+.kpi-delta.down { color: var(--red); }
+.kpi-label {
+  color: var(--text-muted); font-size: 11px;
+}
+
+/* ── ATTENTION LIST ── */
+.attention-list { display: flex; flex-direction: column; }
+.attention-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.15s;
+}
+.attention-row:last-child { border-bottom: none; }
+.attention-row:hover { background: rgba(255,255,255,0.02); margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+.attention-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+.attention-text { flex: 1; font-size: 13px; color: var(--text-dim); }
+.attention-badge { flex-shrink: 0; cursor: pointer; }
+
+/* ── AT-RISK ROW ── */
+.at-risk-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.at-risk-row:last-child { border-bottom: none; }
+.at-risk-company { font-size: 13px; font-weight: 500; min-width: 100px; }
+.at-risk-meta { display: flex; align-items: center; gap: 8px; flex: 1; }
+.at-risk-arr { font-size: 13px; white-space: nowrap; }
+
+/* ── DASH CONTROLS ── */
+.dash-controls { display: flex; gap: 8px; align-items: center; }
+
 /* ── CARDS ── */
 .card {
   background: var(--surface);

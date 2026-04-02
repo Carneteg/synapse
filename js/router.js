@@ -8,12 +8,13 @@ const Router = (() => {
   const registry = {};
 
   // ── Category definitions ──
+  // topbarAction: HTML string for action button, or '' for none
   const categories = {
-    home:         { label: 'Home',         icon: '◈', default: 'dashboard' },
-    intelligence: { label: 'Intelligence', icon: '◉', default: 'today' },
-    qa:           { label: 'QA',           icon: '▣', default: 'qa-summary' },
-    mastermind:   { label: 'Mastermind',   icon: '◌', default: 'mastermind-search' },
-    operations:   { label: 'Operations',   icon: '⟳', default: 'ar-dashboard' },
+    home:         { label: 'Home',         icon: '◈', default: 'dashboard',          topbarAction: '<button class="sync-btn" id="topbar-refresh-btn">⟳ Refresh</button>' },
+    intelligence: { label: 'Intelligence', icon: '◉', default: 'today',              topbarAction: '' },
+    qa:           { label: 'QA',           icon: '▣', default: 'qa-summary',         topbarAction: '' },
+    mastermind:   { label: 'Mastermind',   icon: '◌', default: 'mastermind-search',  topbarAction: '' },
+    operations:   { label: 'Operations',   icon: '⟳', default: 'ar-dashboard',      topbarAction: '<button class="sync-btn" id="topbar-sync-btn">⟳ Sync Now</button>' },
   };
 
   // ── Page map: id → { title, hash, category, badges? } ──
@@ -80,8 +81,9 @@ const Router = (() => {
     container.appendChild(div);
     if (renderFn.afterRender) renderFn.afterRender();
 
-    // Update topbar breadcrumb
+    // Update topbar breadcrumb + action
     updateBreadcrumb(id, info);
+    updateTopbarAction(info);
 
     // Update sidebar active state
     updateSidebar(id, info);
@@ -107,6 +109,20 @@ const Router = (() => {
         `<span class="breadcrumb-current">${info.title}</span>`;
       if (backBtn) backBtn.style.display = '';
     }
+  }
+
+  function updateTopbarAction(info) {
+    const el = document.getElementById('topbar-action');
+    if (!el) return;
+    const cat = categories[info.category];
+    el.innerHTML = cat?.topbarAction || '';
+
+    // Wire action buttons
+    const syncBtn = document.getElementById('topbar-sync-btn');
+    if (syncBtn) syncBtn.addEventListener('click', () => go('sync'));
+
+    const refreshBtn = document.getElementById('topbar-refresh-btn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => go('dashboard'));
   }
 
   function updateSidebar(id, info) {

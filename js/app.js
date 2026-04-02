@@ -57,11 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // ── TOPBAR SYNC BUTTON ──
-    document.getElementById('topbar-sync-btn')?.addEventListener('click', () => {
-      Router.go('sync');
-    });
-
     // ── HASH-BASED ROUTING ──
     Router.initHashListener();
 

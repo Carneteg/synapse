@@ -152,6 +152,42 @@ const UI = {
     return 'var(--red)';
   },
 
+  // ── KPI CARD ──
+  kpiCard(title, value, delta, dir, label, color) {
+    const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
+    const dirCls = dir === 'down' ? 'down' : dir === 'up' ? 'up' : '';
+    return `
+      <div class="card kpi-card">
+        <div class="card-title mb-2">${title}</div>
+        <div class="stat-big" style="color:${color}">${value}</div>
+        <div class="kpi-delta ${dirCls}">${arrow} ${delta} <span class="kpi-label">${label}</span></div>
+      </div>`;
+  },
+
+  // ── ATTENTION ROW ──
+  attentionRow(icon, text, badge, page) {
+    return `
+      <div class="attention-row" data-page="${page}">
+        <span class="attention-icon">${icon}</span>
+        <span class="attention-text">${text}</span>
+        <span class="badge ${badge} attention-badge">→</span>
+      </div>`;
+  },
+
+  // ── AT-RISK ROW ──
+  atRiskRow(company, arr, tickets, repeats, status) {
+    return `
+      <div class="at-risk-row">
+        <div class="at-risk-company">${company}</div>
+        <div class="at-risk-meta">
+          ${UI.healthBadge(status)}
+          <span class="font-mono text-dim">${tickets} tickets</span>
+          <span class="font-mono" style="color:var(--red)">${repeats} repeats</span>
+        </div>
+        <div class="at-risk-arr font-mono text-green">${arr} NOK</div>
+      </div>`;
+  },
+
   // ── CHAT MESSAGE ──
   chatMsg(text, role) {
     const isUser = role === 'user';
