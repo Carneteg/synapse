@@ -12,6 +12,25 @@
 </head>
 <body>
 
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-mark">S</div>
+        <span class="logo-text font-syne">Synapse</span>
+      </div>
+      <p class="login-subtitle">Customer Intelligence Platform</p>
+      <form id="login-form" autocomplete="off">
+        <label class="login-label" for="login-email">Email</label>
+        <input class="input" id="login-email" type="email" placeholder="you@company.com" required>
+        <label class="login-label" for="login-password">Password</label>
+        <input class="input" id="login-password" type="password" placeholder="Enter password" required>
+        <div id="login-error" class="login-error"></div>
+        <button type="submit" class="btn btn-primary login-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+
   <!-- SIDEBAR -->
   <nav id="sidebar">
     <div class="sidebar-logo">
@@ -76,6 +95,7 @@
     <div id="page-container"></div>
   </main>
 
+  <script src="js/auth.js"></script>
   <script src="js/data.js"></script>
   <script src="js/router.js"></script>
   <script src="js/components.js"></script>

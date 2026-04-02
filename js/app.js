@@ -5,17 +5,28 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  // ── NAV CLICKS ──
-  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
-    item.addEventListener('click', () => Router.go(item.dataset.page));
-  });
+  // ── AUTH GATE ──
+  Auth.init();
 
-  // ── TOPBAR SYNC BUTTON ──
-  document.getElementById('topbar-sync-btn')?.addEventListener('click', () => {
-    Router.go('sync');
-  });
+  function bootApp() {
+    // ── NAV CLICKS ──
+    document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+      item.addEventListener('click', () => Router.go(item.dataset.page));
+    });
 
-  // ── INITIAL PAGE ──
-  Router.go('dashboard');
+    // ── TOPBAR SYNC BUTTON ──
+    document.getElementById('topbar-sync-btn')?.addEventListener('click', () => {
+      Router.go('sync');
+    });
+
+    // ── INITIAL PAGE ──
+    Router.go('dashboard');
+  }
+
+  if (Auth.isAuthenticated()) {
+    bootApp();
+  } else {
+    document.addEventListener('authSuccess', bootApp, { once: true });
+  }
 
 });
