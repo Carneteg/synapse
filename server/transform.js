@@ -5,17 +5,51 @@
  * the exact structure expected by js/data.js.
  */
 
-// Freshdesk status codes: 2=Open, 3=Pending, 4=Resolved, 5=Closed
+// ── Freshdesk field constants ──
 const STATUS = { OPEN: 2, PENDING: 3, RESOLVED: 4, CLOSED: 5 };
+const STATUS_LABEL = { 2: 'Open', 3: 'Pending', 4: 'Resolved', 5: 'Closed' };
 const PRIORITY = { LOW: 1, MEDIUM: 2, HIGH: 3, URGENT: 4 };
 const PRIORITY_LABEL = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent' };
+const SOURCE = { EMAIL: 1, PORTAL: 2, PHONE: 3, CHAT: 7, BOT: 9 };
+const SOURCE_LABEL = { 1: 'Email', 2: 'Portal', 3: 'Phone', 7: 'Chat', 9: 'Bot' };
 
 function timeAgo(dateStr) {
+  if (!dateStr) return '—';
   const diff = Date.now() - new Date(dateStr).getTime();
   const hours = Math.floor(diff / 3600000);
+  if (hours < 0) return 'future';
   if (hours < 1) return '<1h';
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
+}
+
+/**
+ * Compute resolution time from stats fields (available with include=stats).
+ * Returns human-readable string or '—' if not resolved.
+ */
+function resolutionTime(ticket) {
+  const stats = ticket.stats;
+  if (!stats) return '—';
+  const resolved = stats.resolved_at || stats.closed_at;
+  if (!resolved) return '—';
+  const created = new Date(ticket.created_at);
+  const done = new Date(resolved);
+  const hours = Math.round((done - created) / 3600000);
+  if (hours < 1) return '<1h';
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+/**
+ * Compute first response time from stats (available with include=stats).
+ * Returns hours as number, or null.
+ */
+function firstResponseHours(ticket) {
+  const stats = ticket.stats;
+  if (!stats || !stats.first_responded_at) return null;
+  const created = new Date(ticket.created_at);
+  const responded = new Date(stats.first_responded_at);
+  return Math.round((responded - created) / 3600000 * 10) / 10;
 }
 
 /**
@@ -62,6 +96,10 @@ function transformTickets(tickets) {
          : t.due_by && (new Date(t.due_by) - now) < 4 * 3600000 ? 'At Risk'
          : 'N/A',
       arr: '—',
+      source: SOURCE_LABEL[t.source] || 'Unknown',
+      responder_id: t.responder_id,
+      first_response: firstResponseHours(t),
+      resolution_time: resolutionTime(t),
     }));
 
   // Documents: recent tickets as indexed documents
@@ -72,6 +110,9 @@ function transformTickets(tickets) {
     title: t.subject || '(no subject)',
     indexed: t.status !== STATUS.PENDING,
     status: t.status === STATUS.PENDING ? 'Queued' : 'Indexed',
+    channel: SOURCE_LABEL[t.source] || 'Unknown',
+    ticketStatus: STATUS_LABEL[t.status] || 'Unknown',
+    created_at: t.created_at,
   }));
 
   // Tag frequency from ticket tags
@@ -124,10 +165,30 @@ function transformTickets(tickets) {
     lastSync: new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC',
   }];
 
+  // Quality stats from stats fields (when include=stats is used)
+  const ticketsWithStats = tickets.filter(t => t.stats);
+  let qualityStats = { firstResponse: '—', resolution: '—', sla: '—', effort: '—' };
+  if (ticketsWithStats.length > 0) {
+    const frTimes = ticketsWithStats.map(firstResponseHours).filter(v => v !== null);
+    const avgFR = frTimes.length > 0 ? (frTimes.reduce((a, b) => a + b, 0) / frTimes.length).toFixed(1) + 'h' : '—';
+
+    const resTimes = ticketsWithStats.filter(t => t.stats.resolved_at).map(t => {
+      return (new Date(t.stats.resolved_at) - new Date(t.created_at)) / 3600000;
+    });
+    const avgRes = resTimes.length > 0 ? (resTimes.reduce((a, b) => a + b, 0) / resTimes.length).toFixed(1) + 'h' : '—';
+
+    const slaOk = openOrPending.filter(t => !t.due_by || new Date(t.due_by) > now).length;
+    const slaTotal = openOrPending.length;
+    const slaPct = slaTotal > 0 ? Math.round((slaOk / slaTotal) * 100) + '%' : '—';
+
+    qualityStats = { firstResponse: avgFR, resolution: avgRes, sla: slaPct, effort: '—' };
+  }
+
   return {
     freshdeskStats, freshdeskPriority, freshdeskTags,
     pressingStats, pressingTickets: urgent,
     documents, trendingTags, trendingKeywords, sources,
+    qualityStats,
   };
 }
 
@@ -156,11 +217,27 @@ function transformCompanies(companies, tickets) {
 
       const status = sla < 70 || repeats >= 4 ? 'At Risk' : sla < 85 || repeats >= 2 ? 'Watch' : 'Healthy';
 
+      // Compute avgRes from stats if available
+      const resolvedTickets = cTickets.filter(t => {
+        const ra = t.stats?.resolved_at || t.stats?.closed_at;
+        return !!ra;
+      });
+      let avgRes = '—';
+      if (resolvedTickets.length > 0) {
+        const totalHours = resolvedTickets.reduce((sum, t) => {
+          const ra = new Date(t.stats?.resolved_at || t.stats?.closed_at);
+          const ca = new Date(t.created_at);
+          return sum + (ra - ca) / 3600000;
+        }, 0);
+        const avg = Math.round(totalHours / resolvedTickets.length);
+        avgRes = avg < 24 ? `${avg}h` : `${Math.round(avg / 24)}d`;
+      }
+
       return {
         company: c.name,
         tickets: total,
         resRate,
-        avgRes: '—',
+        avgRes,
         repeats,
         arr: c.custom_fields?.arr || '—',
         sla: sla + '%',
@@ -219,23 +296,24 @@ function transformAgents(agents) {
 /**
  * Build dashboard KPIs from aggregated stats.
  */
-function transformDashboardKPIs(freshdeskStats, pressingStats, churnCount, draftCount) {
+function transformDashboardKPIs(freshdeskStats, pressingStats, churnCount, draftCount, qualityStats) {
+  const slaValue = qualityStats?.sla || '—';
   const kpiBase = {
     today: [
       { title: 'Open Tickets',   value: String(freshdeskStats.open), delta: '', dir: '', label: 'current', color: 'var(--accent)' },
-      { title: 'SLA Compliance', value: '—', delta: '', dir: '', label: 'live data', color: 'var(--yellow)' },
+      { title: 'SLA Compliance', value: slaValue, delta: '', dir: '', label: 'live data', color: 'var(--yellow)' },
       { title: 'Churn Signals',  value: String(churnCount), delta: '', dir: '', label: 'detected', color: 'var(--red)' },
       { title: 'Drafts Pending', value: String(draftCount), delta: '', dir: '', label: 'awaiting review', color: 'var(--green)' },
     ],
     week: [
       { title: 'Open Tickets',   value: String(freshdeskStats.open), delta: '', dir: '', label: 'current', color: 'var(--accent)' },
-      { title: 'SLA Compliance', value: '—', delta: '', dir: '', label: 'live data', color: 'var(--yellow)' },
+      { title: 'SLA Compliance', value: slaValue, delta: '', dir: '', label: 'live data', color: 'var(--yellow)' },
       { title: 'Churn Signals',  value: String(churnCount), delta: '', dir: '', label: 'detected', color: 'var(--red)' },
       { title: 'Drafts Pending', value: String(draftCount), delta: '', dir: '', label: 'awaiting review', color: 'var(--green)' },
     ],
     month: [
       { title: 'Open Tickets',   value: String(freshdeskStats.open), delta: '', dir: '', label: 'current', color: 'var(--accent)' },
-      { title: 'SLA Compliance', value: '—', delta: '', dir: '', label: 'live data', color: 'var(--yellow)' },
+      { title: 'SLA Compliance', value: slaValue, delta: '', dir: '', label: 'live data', color: 'var(--yellow)' },
       { title: 'Churn Signals',  value: String(churnCount), delta: '', dir: '', label: 'detected', color: 'var(--red)' },
       { title: 'Drafts Pending', value: String(draftCount), delta: '', dir: '', label: 'awaiting review', color: 'var(--green)' },
     ],

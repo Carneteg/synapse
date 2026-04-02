@@ -258,7 +258,7 @@ app.get('/api/freshdesk/companies', requireConfig, async (req, res) => {
     if (cached) return res.json({ ...cached, _cached: true });
 
     const companies = await freshdesk.paginate('/companies');
-    const rawTickets = await freshdesk.listTickets({ order_by: 'created_at', order_type: 'desc' });
+    const rawTickets = await freshdesk.listTickets({ order_by: 'created_at', order_type: 'desc', include: 'stats' });
     const data = transform.transformCompanies(companies, rawTickets);
     cache.set('companies', data, TTL.companies);
     res.json({ ...data, _cached: false });
@@ -294,11 +294,11 @@ app.get('/api/freshdesk/stats', requireConfig, async (req, res) => {
     const cached = cache.get('stats');
     if (cached) return res.json({ ...cached, _cached: true });
 
-    let ticketData = cache.get('tickets:all:default:desc:none:none');
+    let ticketData = cache.get('tickets:all:default:desc:stats:none');
     if (!ticketData) {
-      const tickets = await freshdesk.listTickets({ order_by: 'created_at', order_type: 'desc' });
+      const tickets = await freshdesk.listTickets({ order_by: 'created_at', order_type: 'desc', include: 'stats' });
       ticketData = transform.transformTickets(tickets);
-      cache.set('tickets:all:default:desc:none:none', ticketData, TTL.tickets);
+      cache.set('tickets:all:default:desc:stats:none', ticketData, TTL.tickets);
     }
 
     const data = transform.transformDashboardKPIs(
@@ -306,6 +306,7 @@ app.get('/api/freshdesk/stats', requireConfig, async (req, res) => {
       ticketData.pressingStats,
       0,
       5,
+      ticketData.qualityStats,
     );
     cache.set('stats', data, TTL.stats);
     res.json({ ...data, _cached: false });
