@@ -561,4 +561,50 @@ const UI = {
       </div>`;
   },
 
+  // ═══════════════════════════════════════════
+  //  SKELETON / SHIMMER LOADING STATES
+  // ═══════════════════════════════════════════
+
+  /** Skeleton stat card */
+  skelCard() {
+    return `<div class="skel-card"><div class="skel skel-title"></div><div class="skel skel-big"></div><div class="skel skel-label"></div></div>`;
+  },
+
+  /** Skeleton table with N rows */
+  skelTable(rows = 5, cols = 4) {
+    const cells = Array.from({ length: cols }, (_, i) =>
+      `<div class="skel skel-cell${i === 1 ? ' skel-cell-lg' : i === 0 ? ' skel-cell-sm' : ''}"></div>`
+    ).join('');
+    const rowsHtml = Array.from({ length: rows }, () =>
+      `<div class="skel-row">${cells}</div>`
+    ).join('');
+    return `<div class="skel-table">${rowsHtml}</div>`;
+  },
+
+  /** Skeleton section header */
+  skelHead() {
+    return `<div class="skel-head"><div class="skel skel-h2"></div><div class="skel skel-sub"></div></div>`;
+  },
+
+  /** Skeleton bar chart */
+  skelChart() {
+    const bars = [65, 80, 55, 90, 70, 40, 60].map(h =>
+      `<div class="skel skel-bar" style="height:${h}%"></div>`
+    ).join('');
+    return `<div class="skel-chart">${bars}</div>`;
+  },
+
+  /** Full page skeleton (mimics dashboard layout) */
+  skelPage() {
+    return `
+      ${UI.skelHead()}
+      <div class="grid-4 mb-4">${UI.skelCard()}${UI.skelCard()}${UI.skelCard()}${UI.skelCard()}</div>
+      <div class="grid-2 mb-4">
+        ${UI.skelTable(5, 3)}
+        ${UI.skelTable(3, 2)}
+      </div>
+      ${UI.skelChart()}
+    `;
+  },
+
 };
