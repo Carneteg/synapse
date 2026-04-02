@@ -17,25 +17,28 @@ const Router = (() => {
     operations:   { label: 'Operations',   icon: '⟳', default: 'ar-dashboard',      topbarAction: '<button class="sync-btn" id="topbar-sync-btn">⟳ Sync Now</button>' },
   };
 
-  // ── Page map: id → { title, hash, category, badges? } ──
+  // ── Page map: id → { title, hash, category, minRole? } ──
+  // minRole: minimum role required to access this page (agent < manager < admin).
+  // Pages without minRole are accessible to all authenticated users.
   const pageMap = {
     'dashboard':           { title: 'Home',                   hash: '#/',                         category: 'home' },
     'intel-hub':           { title: 'Intelligence Hub',       hash: '#/intelligence',             category: 'intelligence' },
     'qa-summary':          { title: 'Summary',                hash: '#/qa',                       category: 'qa' },
-    'churn-risk':          { title: 'Churn Risk',             hash: '#/qa/churn-risk',            category: 'qa' },
+    'churn-risk':          { title: 'Churn Risk',             hash: '#/qa/churn-risk',            category: 'qa',          minRole: 'manager' },
+    'qa-coaching':         { title: 'Coaching',               hash: '#/qa/coaching',              category: 'qa',          minRole: 'manager' },
     'mastermind-search':   { title: 'Search',                 hash: '#/mastermind',               category: 'mastermind' },
     'mastermind-chat':     { title: 'Chat',                   hash: '#/mastermind/chat',          category: 'mastermind' },
     'mastermind-articles': { title: 'Articles',               hash: '#/mastermind/articles',      category: 'mastermind' },
     'mastermind-agents':   { title: 'Agents',                 hash: '#/mastermind/agents',        category: 'mastermind' },
-    'ar-dashboard':        { title: 'Auto-Responder',         hash: '#/operations',               category: 'operations' },
-    'ar-drafts':           { title: 'Draft Queue',            hash: '#/operations/drafts',        category: 'operations' },
-    'ar-config':           { title: 'Configuration',          hash: '#/operations/config',        category: 'operations' },
-    'mastermind-settings': { title: 'Pipeline Settings',      hash: '#/operations/pipeline',      category: 'operations' },
-    'sync':                { title: 'Data Sync',              hash: '#/operations/sync',          category: 'operations' },
-    'documents':           { title: 'Documents',              hash: '#/operations/documents',     category: 'operations' },
-    'stats-freshdesk':     { title: 'Freshdesk',              hash: '#/operations/freshdesk',     category: 'operations' },
-    'stats-jira':          { title: 'Jira',                   hash: '#/operations/jira',          category: 'operations' },
-    'stats-attachments':   { title: 'Attachments',            hash: '#/operations/attachments',   category: 'operations' },
+    'ar-dashboard':        { title: 'Auto-Responder',         hash: '#/operations',               category: 'operations',  minRole: 'manager' },
+    'ar-drafts':           { title: 'Draft Queue',            hash: '#/operations/drafts',        category: 'operations',  minRole: 'manager' },
+    'ar-config':           { title: 'Configuration',          hash: '#/operations/config',        category: 'operations',  minRole: 'admin' },
+    'mastermind-settings': { title: 'Pipeline Settings',      hash: '#/operations/pipeline',      category: 'operations',  minRole: 'admin' },
+    'sync':                { title: 'Data Sync',              hash: '#/operations/sync',          category: 'operations',  minRole: 'manager' },
+    'documents':           { title: 'Documents',              hash: '#/operations/documents',     category: 'operations',  minRole: 'manager' },
+    'stats-freshdesk':     { title: 'Freshdesk',              hash: '#/operations/freshdesk',     category: 'operations',  minRole: 'manager' },
+    'stats-jira':          { title: 'Jira',                   hash: '#/operations/jira',          category: 'operations',  minRole: 'manager' },
+    'stats-attachments':   { title: 'Attachments',            hash: '#/operations/attachments',   category: 'operations',  minRole: 'manager' },
   };
 
   // ── Reverse lookup: hash → pageId ──
@@ -56,8 +59,14 @@ const Router = (() => {
     const renderFn = registry[id];
     if (!renderFn) { console.warn('No page registered for:', id); return; }
 
-    currentId = id;
     const info = pageMap[id] || { title: id, hash: '#/', category: 'home' };
+
+    // ── ROLE GATE: redirect to dashboard if user lacks access ──
+    if (info.minRole && typeof Auth !== 'undefined' && !Auth.hasRole(info.minRole)) {
+      if (id !== 'dashboard') { go('dashboard'); return; }
+    }
+
+    currentId = id;
 
     // Update hash without triggering hashchange loop
     if (!opts._fromHash && location.hash !== info.hash) {

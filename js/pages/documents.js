@@ -1,5 +1,6 @@
 const docsFn = () => `
-  ${UI.sectionHead('Documents', 'All ingested records across sources')}
+  ${UI.sectionHead('Documents', 'All ingested records across sources',
+    UI.tableExportBtn('docs-table', 'documents'))}
 
   <div class="card">
     ${UI.table({
@@ -20,6 +21,7 @@ const docsFn = () => `
 
 docsFn.afterRender = () => {
   UI.tableInit('docs-table');
+  UI.tableExportBtnInit('docs-table', 'documents', 'Documents');
 };
 
 Router.register('documents', docsFn);

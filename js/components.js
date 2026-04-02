@@ -94,6 +94,7 @@ const UI = {
   // ── INTERACTIVE TABLE ──
   // Returns HTML string. Call UI.tableInit(id) in afterRender to wire up.
   _tableConfigs: {},
+  _tableStates: {},
 
   table(cfg) {
     const { id, columns, data, pageSize = 10, filterable = true, onRowClick } = cfg;
@@ -227,6 +228,9 @@ const UI = {
         }, 200);
       });
     }
+
+    // Expose filtered state for export system
+    UI._tableStates[id] = { getFiltered: () => filtered };
 
     renderRows();
   },
@@ -377,6 +381,76 @@ const UI = {
       </div>`;
   },
 
+  // ── AGENT CARD (for coaching page) ──
+  agentCard(agent) {
+    const delta = agent.score - agent.prevScore;
+    const deltaStr = delta >= 0 ? `+${delta}` : `${delta}`;
+    const deltaCls = delta >= 0 ? 'up' : 'down';
+    const deltaColor = delta >= 0 ? 'var(--green)' : 'var(--red)';
+    return `
+      <div class="agent-card card" data-agent-id="${agent.id}">
+        <div class="agent-card-top">
+          <div class="agent-avatar agent-avatar-lg">${agent.initials}</div>
+          <div class="agent-card-info">
+            <div class="agent-card-name">${agent.name}</div>
+            <div class="agent-card-meta">${agent.tickets} tickets scored</div>
+          </div>
+        </div>
+        <div class="agent-card-score">
+          <span class="score-gauge" style="color:${UI.scoreColor(agent.score)}">${agent.score}</span>
+          <span class="score-gauge-label">/ 100</span>
+          <span class="score-delta" style="color:${deltaColor}">${deltaStr}</span>
+        </div>
+        ${agent.flags > 0 ? `<div class="agent-card-flags">${UI.badge(agent.flags + ' flag' + (agent.flags !== 1 ? 's' : ''), agent.flags >= 3 ? 'badge-red' : 'badge-yellow')}</div>` : '<div class="agent-card-flags"></div>'}
+        <button class="btn btn-ghost btn-sm agent-card-btn">View Profile</button>
+      </div>`;
+  },
+
+  // ── SCORE GAUGE (large, with delta) ──
+  scoreGauge(score, prev) {
+    const delta = score - prev;
+    const deltaStr = delta >= 0 ? `+${delta}` : `${delta}`;
+    const deltaColor = delta >= 0 ? 'var(--green)' : 'var(--red)';
+    return `
+      <div class="score-gauge-block">
+        <span class="score-gauge-big" style="color:${UI.scoreColor(score)}">${score}</span>
+        <span class="score-gauge-sub">/ 100</span>
+        <span class="score-gauge-delta" style="color:${deltaColor}">${deltaStr} vs last run</span>
+      </div>`;
+  },
+
+  // ── COACHING ACTION (stop/start/continue) ──
+  coachingAction(type, text) {
+    const config = {
+      stop:     { color: 'var(--red)',    icon: '✕', label: 'Stop' },
+      start:    { color: 'var(--green)',  icon: '✓', label: 'Start' },
+      continue: { color: 'var(--accent)', icon: '→', label: 'Continue' },
+    };
+    const c = config[type] || config.continue;
+    return `
+      <div class="coaching-action" style="border-left:3px solid ${c.color}">
+        <span class="coaching-action-label" style="color:${c.color}">${c.icon} ${c.label}</span>
+        <span class="coaching-action-text">${text}</span>
+      </div>`;
+  },
+
+  // ── DIMENSION BAR WITH TEAM COMPARISON ──
+  dimBarCompare(label, score, teamAvg, color) {
+    const pct = (score / 5) * 100;
+    const teamPct = (teamAvg / 5) * 100;
+    return `
+      <div class="dim-row">
+        <div class="dim-label-row">
+          <span>${label}</span>
+          <span class="dim-val">${score} / 5 <span class="dim-team-avg">(team ${teamAvg})</span></span>
+        </div>
+        <div class="progress-bar dim-compare-bar">
+          <div class="progress-fill" style="width:${pct}%;background:${color}"></div>
+          <div class="dim-team-marker" style="left:${teamPct}%" title="Team avg: ${teamAvg}"></div>
+        </div>
+      </div>`;
+  },
+
   // ── CHAT MESSAGE ──
   chatMsg(text, role) {
     const isUser = role === 'user';
@@ -384,6 +458,106 @@ const UI = {
       <div class="chat-msg${isUser ? ' user' : ''}">
         <div class="chat-msg-label">${isUser ? 'YOU' : 'SYNAPSE AI'}</div>
         <div class="chat-bubble${isUser ? ' user' : ''}">${text}</div>
+      </div>`;
+  },
+
+  // ═══════════════════════════════════════════
+  //  DATA TRUST & FRESHNESS COMPONENTS
+  // ═══════════════════════════════════════════
+
+  // ── STALENESS THRESHOLDS (ms) ──
+  _staleThresholds: {
+    tickets:   { fresh: 5*60000, normal: 30*60000, stale: 120*60000 },
+    stats:     { fresh: 5*60000, normal: 30*60000, stale: 120*60000 },
+    companies: { fresh: 15*60000, normal: 60*60000, stale: 240*60000 },
+    qa:        { fresh: 60*60000, normal: 8*3600000, stale: 24*3600000 },
+    briefing:  { fresh: 60*60000, normal: 12*3600000, stale: 24*3600000 },
+    drafts:    { fresh: 30*60000, normal: 120*60000, stale: 8*3600000 },
+    churn:     { fresh: 60*60000, normal: 8*3600000, stale: 24*3600000 },
+    default:   { fresh: 5*60000, normal: 30*60000, stale: 120*60000 },
+  },
+
+  // ── RELATIVE TIME STRING ──
+  _relativeTime(isoStr) {
+    if (!isoStr) return 'unknown';
+    const ms = Date.now() - new Date(isoStr).getTime();
+    if (ms < 60000) return 'just now';
+    if (ms < 3600000) return Math.floor(ms / 60000) + 'm ago';
+    if (ms < 86400000) return Math.floor(ms / 3600000) + 'h ago';
+    return Math.floor(ms / 86400000) + 'd ago';
+  },
+
+  // ── FRESHNESS LEVEL ──
+  _freshLevel(isoStr, type) {
+    if (!isoStr) return 'unknown';
+    const ms = Date.now() - new Date(isoStr).getTime();
+    const t = UI._staleThresholds[type] || UI._staleThresholds.default;
+    if (ms <= t.fresh) return 'fresh';
+    if (ms <= t.normal) return 'normal';
+    if (ms <= t.stale) return 'stale';
+    return 'critical';
+  },
+
+  _freshColor(level) {
+    return { fresh: 'var(--green)', normal: 'var(--text-muted)', stale: 'var(--yellow)', critical: 'var(--red)', unknown: 'var(--text-dim)' }[level] || 'var(--text-dim)';
+  },
+
+  // ── FRESHNESS BADGE (inline) ──
+  // Shows colored dot + "Updated Xm ago" or "Stale — Xm ago"
+  freshBadge(freshnessKey) {
+    const f = DATA.freshness?.[freshnessKey];
+    if (!f) return '';
+    const level = UI._freshLevel(f.fetchedAt, freshnessKey);
+    const color = UI._freshColor(level);
+    const time = UI._relativeTime(f.fetchedAt);
+    const prefix = level === 'stale' ? 'Stale — ' : level === 'critical' ? 'Outdated — ' : '';
+    const sourceLabel = f.source === 'ai_generated' ? 'AI' : f.source === 'cache' ? 'Cached' : f.source === 'freshdesk_api' ? 'Live' : 'Demo';
+    return `<span class="fresh-badge" title="${f.fetchedAt ? 'Fetched: ' + new Date(f.fetchedAt).toLocaleString() : ''}"><span class="fresh-dot" style="background:${color}"></span>${prefix}${sourceLabel} ${time}</span>`;
+  },
+
+  // ── SOURCE ATTRIBUTION BAR (for AI content) ──
+  sourceBar(freshnessKey, labelOverride) {
+    const f = DATA.freshness?.[freshnessKey];
+    if (!f) return '';
+    const label = labelOverride || (f.source === 'ai_generated' ? 'AI Analysis' : 'Live Data');
+    const model = f.model ? ` · ${f.model}` : '';
+    const time = UI._relativeTime(f.fetchedAt);
+    const isAI = f.source === 'ai_generated';
+    return `<div class="source-bar ${isAI ? 'source-bar-ai' : 'source-bar-live'}"><span class="source-bar-label">${isAI ? '◈' : '●'} ${label}${model}</span><span class="source-bar-time">${time}</span></div>`;
+  },
+
+  // ── CARD FRESHNESS FOOTER ──
+  // Subtle "● Xm ago" to embed inside stat cards
+  cardFreshness(freshnessKey) {
+    const f = DATA.freshness?.[freshnessKey];
+    if (!f) return '';
+    const level = UI._freshLevel(f.fetchedAt, freshnessKey);
+    const color = UI._freshColor(level);
+    const time = UI._relativeTime(f.fetchedAt);
+    return `<div class="card-freshness"><span class="fresh-dot" style="background:${color}"></span>${time}</div>`;
+  },
+
+  // ── STALE DATA WARNING BANNER ──
+  staleWarning(freshnessKey, message) {
+    const f = DATA.freshness?.[freshnessKey];
+    if (!f) return '';
+    const level = UI._freshLevel(f.fetchedAt, freshnessKey);
+    if (level !== 'stale' && level !== 'critical') return '';
+    const time = UI._relativeTime(f.fetchedAt);
+    const msg = message || `Data may be outdated — last updated ${time}`;
+    const cls = level === 'critical' ? 'stale-warning-critical' : '';
+    return `<div class="stale-warning ${cls}"><span class="stale-warning-icon">&#9888;</span><span class="stale-warning-text">${msg}</span><button class="btn btn-ghost btn-sm stale-warning-action" data-navigate="sync">Sync Now</button></div>`;
+  },
+
+  // ── ENHANCED STAT CARD WITH FRESHNESS ──
+  statCardFresh(title, value, label, freshnessKey, delta, deltaDir, color) {
+    return `
+      <div class="card card-fresh">
+        <div class="card-title mb-2">${title}</div>
+        <div class="stat-big"${color ? ` style="color:${color}"` : ''}>${value}</div>
+        <div class="stat-label">${label}</div>
+        ${delta ? `<div class="stat-delta ${deltaDir || ''}">${delta}</div>` : ''}
+        ${UI.cardFreshness(freshnessKey)}
       </div>`;
   },
 

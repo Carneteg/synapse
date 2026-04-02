@@ -49,6 +49,127 @@
   border-radius: 8px;
 }
 
+/* ── LOGIN: PASSWORD TOGGLE ── */
+.login-pass-wrap {
+  position: relative;
+}
+.login-pass-wrap .input {
+  padding-right: 36px;
+}
+.login-pass-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.login-pass-toggle:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+/* ── SIDEBAR: USER BLOCK ── */
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+}
+.sidebar-user .agent-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.sidebar-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.sidebar-user-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-logout-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+}
+.sidebar-logout-btn:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ── SESSION TOAST ── */
+.session-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface2);
+  border: 1px solid var(--yellow);
+  border-radius: 10px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 2000;
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  pointer-events: none;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+.session-toast.visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.session-toast-text {
+  font-size: 13px;
+  color: var(--yellow);
+  font-family: 'DM Mono', monospace;
+}
+.session-toast-action {
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.session-toast-action:hover {
+  color: var(--text);
+}
+
 /* ── SOURCE LABELS ── */
 .source-label {
   display: inline-flex; align-items: center;
@@ -554,3 +675,418 @@ input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
   cursor: pointer;
 }
 .select:focus { border-color: var(--accent); }
+
+/* ── QA COACHING: AGENT CARDS ── */
+.agent-card {
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agent-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.agent-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agent-avatar-lg {
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+}
+.agent-card-info {
+  display: flex;
+  flex-direction: column;
+}
+.agent-card-name {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 14px;
+}
+.agent-card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.agent-card-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.score-gauge {
+  font-family: 'DM Mono', monospace;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+.score-gauge-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.score-delta {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.agent-card-flags {
+  min-height: 22px;
+}
+.agent-card-btn {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+/* ── QA COACHING: SCORE GAUGE (drill-down) ── */
+.score-gauge-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.score-gauge-big {
+  font-family: 'DM Mono', monospace;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+}
+.score-gauge-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.score-gauge-delta {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* ── QA COACHING: COACHING NOTES ── */
+.coaching-note-box {
+  margin-bottom: 8px;
+}
+.coaching-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.coaching-textarea:focus {
+  border-color: var(--accent);
+}
+.coaching-textarea::placeholder {
+  color: var(--text-dim);
+}
+.coaching-note-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.coaching-save-status {
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── QA COACHING: NOTE HISTORY ── */
+.coaching-history {
+  margin-bottom: 4px;
+}
+.coaching-history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.coaching-history-entry:last-child {
+  border-bottom: none;
+}
+.coaching-history-time {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+}
+.coaching-history-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── QA COACHING: DIMENSION COMPARISON ── */
+.dim-compare-bar {
+  position: relative;
+}
+.dim-team-marker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text-muted);
+  border-radius: 1px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.dim-team-avg {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.dim-feedback {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 2px 0 8px;
+  padding-left: 2px;
+}
+
+/* ── QA COACHING: EVAL INSIGHT ── */
+.eval-insight {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+/* ── QA COACHING: COACHING ACTIONS ── */
+.coaching-action {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: var(--surface2);
+  border-radius: 6px;
+}
+.coaching-action-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.coaching-action-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════ */
+/*  DATA TRUST & FRESHNESS                    */
+/* ═══════════════════════════════════════════ */
+
+/* ── FRESHNESS BADGE (inline) ── */
+.fresh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.fresh-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── SOURCE ATTRIBUTION BAR ── */
+.source-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 10px;
+}
+.source-bar-ai {
+  background: rgba(124, 92, 252, 0.06);
+  border-left: 3px solid var(--accent2);
+  color: var(--accent2);
+}
+.source-bar-live {
+  background: rgba(34, 197, 94, 0.06);
+  border-left: 3px solid var(--green);
+  color: var(--green);
+}
+.source-bar-label {
+  font-weight: 500;
+}
+.source-bar-time {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* ── CARD FRESHNESS FOOTER ── */
+.card-fresh {
+  position: relative;
+}
+.card-freshness {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── STALE DATA WARNING BANNER ── */
+.stale-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(234, 179, 8, 0.06);
+  border: 1px solid rgba(234, 179, 8, 0.2);
+  border-left: 3px solid var(--yellow);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.stale-warning-critical {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.2);
+  border-left-color: var(--red);
+}
+.stale-warning-icon {
+  font-size: 16px;
+  color: var(--yellow);
+  flex-shrink: 0;
+}
+.stale-warning-critical .stale-warning-icon {
+  color: var(--red);
+}
+.stale-warning-text {
+  flex: 1;
+  color: var(--text-muted);
+}
+.stale-warning-action {
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════ */
+/*  ADMIN API CONFIGURATION PANEL             */
+/* ═══════════════════════════════════════════ */
+
+.admin-config-panel {
+  border-top: 3px solid var(--accent2);
+}
+.admin-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.admin-config-header:hover {
+  background: var(--surface2);
+  border-radius: 0 0 12px 12px;
+}
+.admin-config-icon {
+  font-size: 18px;
+  color: var(--accent2);
+}
+.admin-config-chevron {
+  font-size: 18px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+.admin-config-body {
+  padding: 0 16px 16px;
+}
+.admin-config-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  background: rgba(124, 92, 252, 0.04);
+  border-radius: 6px;
+  border-left: 2px solid var(--accent2);
+}
+
+/* ── Service block ── */
+.config-service {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: var(--surface2);
+}
+.config-service:last-child {
+  margin-bottom: 0;
+}
+.config-service-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.config-service-name {
+  font-weight: 600;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+}
+
+/* ── Fields ── */
+.config-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.config-label {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.config-input {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+.config-input::placeholder {
+  font-size: 11px;
+}
+
+/* ── Actions row ── */
+.config-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.config-status {
+  margin-left: auto;
+  font-size: 12px;
+}

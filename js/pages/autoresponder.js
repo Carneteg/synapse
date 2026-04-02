@@ -1,13 +1,16 @@
 // ── AR DASHBOARD ──
 Router.register('ar-dashboard', () => `
   ${UI.sectionHead('Auto-Responder', 'Drafts generated from your knowledge base',
-    `<button class="btn btn-primary" id="ar-run-btn">▶ Run Now</button>`)}
+    `${UI.freshBadge('drafts')} <button class="btn btn-primary" id="ar-run-btn">▶ Run Now</button>`)}
+
+  ${UI.sourceBar('drafts', 'AI Draft Generation')}
+  ${UI.staleWarning('drafts')}
 
   <div class="grid-4 mb-4">
-    ${UI.statCard('Drafts Generated', '143', 'All time')}
-    ${UI.statCard('Pending Review',   '5',   'Awaiting approval', '', '', 'var(--yellow)')}
-    ${UI.statCard('Approval Rate',    '78%', 'Last 30 days',      '', '', 'var(--green)')}
-    ${UI.statCard('Avg Confidence',   '0.74','Score')}
+    ${UI.statCardFresh('Drafts Generated', '143', 'All time',          'drafts')}
+    ${UI.statCardFresh('Pending Review',   '5',   'Awaiting approval', 'drafts', '', '', 'var(--yellow)')}
+    ${UI.statCardFresh('Approval Rate',    '78%', 'Last 30 days',      'drafts', '', '', 'var(--green)')}
+    ${UI.statCardFresh('Avg Confidence',   '0.74','Score',             'drafts')}
   </div>
 
   <div class="grid-2">
@@ -48,7 +51,8 @@ document.addEventListener('pageRendered', ({ detail }) => {
 
 // ── DRAFT QUEUE ──
 Router.register('ar-drafts', () => `
-  ${UI.sectionHead('Draft Queue', 'Review and approve AI-generated responses')}
+  ${UI.sectionHead('Draft Queue', 'Review and approve AI-generated responses',
+    typeof Auth !== 'undefined' && Auth.hasRole('manager') ? UI.exportDropdown({ id: 'drafts', items: [{ label: 'CSV', icon: '\u229E', action: 'csv' }] }) : '')}
 
   <div class="card mb-4">
     <div style="display:flex;gap:8px">
@@ -77,6 +81,18 @@ Router.register('ar-drafts', () => `
     </table>
   </div>
 `);
+
+document.addEventListener('pageRendered', ({ detail }) => {
+  if (detail.id !== 'ar-drafts') return;
+  UI.exportDropdownInit('drafts', {
+    csv: () => UI.exportCSV(DATA.drafts, [
+      { key: 'id', label: 'Ticket' },
+      { key: 'title', label: 'Subject' },
+      { key: 'conf', label: 'Confidence' },
+      { key: 'status', label: 'Status' },
+    ], 'ar-drafts'),
+  });
+});
 
 // ── AR CONFIG ──
 Router.register('ar-config', () => `
