@@ -66,8 +66,27 @@ document.addEventListener('pageRendered', ({ detail }) => {
     }, 280);
   }
 
-  document.getElementById('sync-all-btn')?.addEventListener('click', () => {
-    runSync(DATA.sources);
+  document.getElementById('sync-all-btn')?.addEventListener('click', async () => {
+    if (API.available) {
+      // Live mode: clear cache, re-fetch from Freshdesk, then show log
+      const card   = document.getElementById('sync-log-card');
+      const lines  = document.getElementById('sync-log-lines');
+      const status = document.getElementById('sync-status-badge');
+      card.style.display = 'block';
+      lines.innerHTML = '→ Clearing cache…<br>';
+      status.textContent = 'Running…';
+      status.className = 'badge badge-blue';
+
+      const ok = await API.clearCacheAndRefresh();
+      lines.innerHTML += ok
+        ? '✓ Cache cleared & data refreshed from Freshdesk<br>✓ Sync complete<br>'
+        : '✗ Sync failed — check server logs<br>';
+      status.textContent = ok ? '✓ Done' : '✗ Failed';
+      status.className = ok ? 'badge badge-green' : 'badge badge-red';
+    } else {
+      // Demo mode: simulated sync
+      runSync(DATA.sources);
+    }
   });
 
   document.querySelectorAll('.sync-source-btn').forEach(btn => {

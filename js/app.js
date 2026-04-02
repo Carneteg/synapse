@@ -62,6 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── INITIAL PAGE from hash or default ──
     Router.go(Router.getInitialPage());
+
+    // ── LIVE DATA: attempt to connect to Freshdesk proxy ──
+    API.init();
   }
 
   if (Auth.isAuthenticated()) {
