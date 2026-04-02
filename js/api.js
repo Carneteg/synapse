@@ -169,6 +169,13 @@ const API = (() => {
     }
   }
 
+  // ── Service helpers (cache-first, high-level) ──
+
+  async function service(name) {
+    const { data } = await fetchJSON(`../api/services/${name}`);
+    return data;
+  }
+
   return {
     get available() { return available; },
     get domain() { return domain; },
@@ -177,5 +184,21 @@ const API = (() => {
     refreshAll,
     clearCacheAndRefresh,
     fetchJSON,
+
+    // Data services — each returns the service response or null
+    getDashboardStats:      () => service('dashboard-stats'),
+    getActionableInsights:  () => service('actionable-insights'),
+    getTicketTrends:     (days) => service(`ticket-trends?days=${days || 30}`),
+    getTopIssues:           () => service('top-issues'),
+    getAgentPerformance:    () => service('agent-performance'),
+    getGroupPerformance:    () => service('group-performance'),
+    getCSATByAgent:         () => service('csat-by-agent'),
+    getWorstScoredTickets:  () => service('worst-scored'),
+    getDraftQueue:          () => service('draft-queue'),
+    getCompanyHealth:       () => service('company-health'),
+    getContactsByCompany: (id) => service(`companies/${id}/contacts`),
+    getTicketsByContact:  (id) => service(`contacts/${id}/tickets`),
+    getTicketDetail:      (id) => service(`tickets/${id}/detail`),
+    getAgentTickets:      (id) => service(`agents/${id}/tickets`),
   };
 })();

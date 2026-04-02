@@ -9,6 +9,7 @@ const path = require('path');
 const freshdesk = require('./server/freshdesk');
 const cache = require('./server/cache');
 const transform = require('./server/transform');
+const services = require('./server/services');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -641,6 +642,44 @@ app.get('/api/freshdesk/stats', requireConfig, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// DATA SERVICES (high-level, cache-first)
+// ─────────────────────────────────────────────────────────────────────
+
+// Helper: wrap a service call with error handling
+function svcRoute(fn) {
+  return async (req, res) => {
+    try { res.json(await fn(req)); }
+    catch (err) { handleError(res, err); }
+  };
+}
+
+// Dashboard
+app.get('/api/services/dashboard-stats',      requireConfig, svcRoute(() => services.getDashboardStats()));
+app.get('/api/services/actionable-insights',  requireConfig, svcRoute(() => services.getActionableInsights()));
+
+// Intelligence / Trending
+app.get('/api/services/ticket-trends',        requireConfig, svcRoute(req => services.getTicketTrends(parseInt(req.query.days) || 30)));
+app.get('/api/services/top-issues',           requireConfig, svcRoute(() => services.getTopIssues()));
+app.get('/api/services/agent-performance',    requireConfig, svcRoute(() => services.getAgentPerformance()));
+app.get('/api/services/group-performance',    requireConfig, svcRoute(() => services.getGroupPerformance()));
+
+// QA
+app.get('/api/services/csat-by-agent',        requireConfig, svcRoute(() => services.getCSATByAgent()));
+app.get('/api/services/worst-scored',         requireConfig, svcRoute(() => services.getWorstScoredTickets()));
+
+// Auto-Responder
+app.get('/api/services/draft-queue',          requireConfig, svcRoute(() => services.getDraftQueue()));
+
+// Contacts & Companies
+app.get('/api/services/company-health',       requireConfig, svcRoute(() => services.getCompanyHealth()));
+app.get('/api/services/companies/:id/contacts', requireConfig, svcRoute(req => services.getContactsByCompany(req.params.id)));
+app.get('/api/services/contacts/:id/tickets', requireConfig, svcRoute(req => services.getTicketsByContact(req.params.id)));
+
+// Drill-down
+app.get('/api/services/tickets/:id/detail',   requireConfig, svcRoute(req => services.getTicketDetail(req.params.id)));
+app.get('/api/services/agents/:id/tickets',   requireConfig, svcRoute(req => services.getAgentTickets(req.params.id)));
+
+// ─────────────────────────────────────────────────────────────────────
 // CACHE MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────
 
@@ -708,6 +747,21 @@ app.listen(PORT, () => {
   console.log('  Aggregated:');
   console.log('    GET  /api/freshdesk/stats');
   console.log('    GET  /api/freshdesk/status');
+  console.log('  Data Services:');
+  console.log('    GET  /api/services/dashboard-stats');
+  console.log('    GET  /api/services/actionable-insights');
+  console.log('    GET  /api/services/ticket-trends[?days=30]');
+  console.log('    GET  /api/services/top-issues');
+  console.log('    GET  /api/services/agent-performance');
+  console.log('    GET  /api/services/group-performance');
+  console.log('    GET  /api/services/csat-by-agent');
+  console.log('    GET  /api/services/worst-scored');
+  console.log('    GET  /api/services/draft-queue');
+  console.log('    GET  /api/services/company-health');
+  console.log('    GET  /api/services/companies/:id/contacts');
+  console.log('    GET  /api/services/contacts/:id/tickets');
+  console.log('    GET  /api/services/tickets/:id/detail');
+  console.log('    GET  /api/services/agents/:id/tickets');
   console.log('  Cache:');
   console.log('    GET  /api/freshdesk/cache');
   console.log('    POST /api/freshdesk/cache/clear');
