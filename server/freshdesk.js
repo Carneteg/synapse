@@ -263,6 +263,43 @@ async function autocompleteAgents(term)  { return get(`/agents/autocomplete?term
 async function listGroups()  { return paginate('/groups'); }
 async function getGroup(id)  { return get(`/groups/${id}`); }
 
+// ── GROUP RESOLUTION ──
+// Resolves a group name to its ID. Caches result for session.
+let _groupCache = {};
+async function resolveGroupName(name) {
+  if (!name) return null;
+  if (_groupCache[name]) return _groupCache[name];
+  const groups = await listGroups();
+  const match = groups.find(g => g.name.toLowerCase().trim() === name.toLowerCase().trim());
+  if (match) _groupCache[name] = match.id;
+  return match ? match.id : null;
+}
+
+/**
+ * Get the configured group ID — from env var or returns null.
+ * Call this at request time to pick up env changes.
+ */
+function getConfiguredGroupId() {
+  return _groupCache[process.env.FRESHDESK_GROUP] || null;
+}
+
+/**
+ * Initialize the group filter at startup if FRESHDESK_GROUP is set.
+ */
+async function initGroupFilter() {
+  const groupName = process.env.FRESHDESK_GROUP;
+  if (!groupName || !isConfigured()) return null;
+  try {
+    const id = await resolveGroupName(groupName);
+    if (id) console.log(`  → Group filter active: "${groupName}" → ID ${id}`);
+    else console.warn(`  ⚠ Group "${groupName}" not found in Freshdesk`);
+    return id;
+  } catch (e) {
+    console.warn('  ⚠ Could not resolve group:', e.message);
+    return null;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // COMPANIES
 // ─────────────────────────────────────────────────────────────────────
@@ -307,7 +344,7 @@ module.exports = {
   listAgents, getAgent, getMe, autocompleteAgents,
 
   // Groups
-  listGroups, getGroup,
+  listGroups, getGroup, resolveGroupName, getConfiguredGroupId, initGroupFilter,
 
   // Companies
   listCompanies, getCompany, autocompleteCompanies, searchCompanies,

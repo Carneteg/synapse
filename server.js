@@ -706,6 +706,31 @@ app.get('/api/services/tickets/:id/detail',   requireConfig, svcRoute(req => ser
 app.get('/api/services/agents/:id/tickets',   requireConfig, svcRoute(req => services.getAgentTickets(req.params.id)));
 
 // ─────────────────────────────────────────────────────────────────────
+// GROUP FILTER
+// ─────────────────────────────────────────────────────────────────────
+
+app.get('/api/services/group-filter', (req, res) => {
+  res.json({ groupId: services.getGroupFilter(), configured: !!services.getGroupFilter() });
+});
+
+app.post('/api/services/group-filter', requireConfig, express.json(), async (req, res) => {
+  const { groupName } = req.body || {};
+  if (!groupName) {
+    services.setGroupFilter(null);
+    return res.json({ ok: true, groupId: null, message: 'Group filter cleared' });
+  }
+  try {
+    const groupId = await freshdesk.resolveGroupName(groupName);
+    if (!groupId) return res.status(404).json({ ok: false, error: `Group "${groupName}" not found` });
+    services.setGroupFilter(groupId);
+    cache.clearAll();
+    res.json({ ok: true, groupId, groupName, message: `Filter set to "${groupName}" (ID ${groupId})` });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // CACHE MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────
 
@@ -727,11 +752,15 @@ app.delete('/api/freshdesk/cache/:key', (req, res) => {
 // START
 // ─────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Synapse server running at http://localhost:${PORT}`);
   if (freshdesk.isConfigured()) {
     const cfg = freshdesk.getConfig();
     console.log(`Freshdesk: ${cfg.domain}.freshdesk.com (API key configured)`);
+
+    // Initialize group filter from FRESHDESK_GROUP env var
+    const groupId = await freshdesk.initGroupFilter();
+    if (groupId) services.setGroupFilter(groupId);
   } else {
     console.log('Freshdesk: Not configured — serving mock data only');
     console.log('  → Copy .env.example to .env and add your credentials');

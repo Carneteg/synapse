@@ -463,6 +463,7 @@ const DATA = {
       freshdesk:  [
         { key: 'domain',  label: 'Subdomain',  placeholder: 'yourcompany (for yourcompany.freshdesk.com)', type: 'text' },
         { key: 'apiKey',  label: 'API Key',     placeholder: 'Freshdesk API key from Profile Settings',    type: 'password' },
+        { key: 'group',   label: 'Group Filter', placeholder: 'Customer Care (exact group name to filter by)', type: 'text' },
       ],
       freshchat:  [
         { key: 'domain',  label: 'Domain',      placeholder: 'yourcompany.freshchat.com',                  type: 'text' },
