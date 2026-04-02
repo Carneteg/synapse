@@ -46,6 +46,50 @@ const TTL = {
   stats:          5 * 60,    // 5 min
 };
 
+// ── Structured error response helper ──
+function handleError(res, err, cacheKeyToRemove) {
+  const status = err.status || 500;
+  const body = {
+    error: err.message,
+    status,
+    retryable: err.retryable || false,
+  };
+
+  // 400: Bad request — include detail for debugging
+  if (status === 400) {
+    body.detail = err.detail;
+    body.action = 'Check request parameters';
+  }
+  // 401: Invalid API key — critical alert
+  if (status === 401) {
+    body.action = 'API key is invalid. Check FRESHDESK_API_KEY in .env';
+    body.critical = true;
+  }
+  // 403: Insufficient permissions
+  if (status === 403) {
+    body.action = 'API key lacks permissions for this resource';
+    body.detail = err.detail;
+  }
+  // 404: Not found — remove from cache if present
+  if (status === 404) {
+    if (cacheKeyToRemove) cache.clear(cacheKeyToRemove);
+    body.action = 'Resource not found';
+  }
+  // 429: Rate limited — include retry info
+  if (status === 429) {
+    const rl = freshdesk.getRateLimit();
+    body.rateLimit = rl;
+    body.action = 'Rate limited — request will be retried automatically';
+  }
+  // 5xx: Server error
+  if (status >= 500) {
+    body.action = 'Freshdesk server error — retried with backoff';
+    body.detail = err.detail;
+  }
+
+  res.status(status === 0 ? 502 : status).json(body);
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // HEALTH / STATUS
 // ─────────────────────────────────────────────────────────────────────
@@ -55,7 +99,7 @@ app.get('/api/freshdesk/status', async (req, res) => {
     return res.json({ ok: false, configured: false, error: 'Freshdesk credentials not set. Copy .env.example to .env and add your API key.' });
   }
   const result = await freshdesk.testConnection();
-  res.json({ ...result, configured: true, rateLimitRemaining: freshdesk.getRateLimitRemaining(), cache: cache.list() });
+  res.json({ ...result, configured: true, rateLimit: freshdesk.getRateLimit(), cache: cache.list() });
 });
 
 // ─────────────────────────────────────────────────────────────────────
@@ -88,7 +132,7 @@ app.get('/api/freshdesk/tickets', requireConfig, async (req, res) => {
     cache.set(cacheKey, data, TTL.tickets);
     res.json({ ...data, _cached: false, _cacheKey: cacheKey });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -114,7 +158,7 @@ app.get('/api/freshdesk/tickets/raw', requireConfig, async (req, res) => {
     cache.set(cacheKey, tickets, TTL.tickets);
     res.json({ tickets, _cached: false, count: tickets.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -139,7 +183,7 @@ app.get('/api/freshdesk/tickets/:id(\\d+)', requireConfig, async (req, res) => {
     cache.set(cacheKey, ticket, TTL.ticket_single);
     res.json({ ticket, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -169,7 +213,7 @@ app.get('/api/freshdesk/search/tickets', requireConfig, async (req, res) => {
     cache.set(cacheKey, data, TTL.search);
     res.json({ ...data, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -192,7 +236,7 @@ app.get('/api/freshdesk/tickets/:id(\\d+)/conversations', requireConfig, async (
     cache.set(cacheKey, conversations, TTL.conversations);
     res.json({ conversations, _cached: false, count: conversations.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -216,7 +260,7 @@ app.get('/api/freshdesk/tickets/:id(\\d+)/time_entries', requireConfig, async (r
     cache.set(cacheKey, data, TTL.time_entries);
     res.json({ time_entries: data, _cached: false, count: data.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -244,7 +288,7 @@ app.get('/api/freshdesk/tickets/:id(\\d+)/satisfaction_ratings', requireConfig, 
     if (err.status === 404) {
       return res.json({ satisfaction_ratings: [], _cached: false, count: 0 });
     }
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -263,7 +307,7 @@ app.get('/api/freshdesk/agents', requireConfig, async (req, res) => {
     cache.set('agents', data, TTL.agents);
     res.json({ ...data, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -277,7 +321,7 @@ app.get('/api/freshdesk/agents/raw', requireConfig, async (req, res) => {
     cache.set('agents_raw', agents, TTL.agents);
     res.json({ agents, _cached: false, count: agents.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -291,7 +335,7 @@ app.get('/api/freshdesk/agents/me', requireConfig, async (req, res) => {
     cache.set('agent_me', agent, TTL.agents);
     res.json({ agent, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -303,7 +347,7 @@ app.get('/api/freshdesk/agents/autocomplete', requireConfig, async (req, res) =>
     const agents = await freshdesk.autocompleteAgents(term);
     res.json({ agents, count: Array.isArray(agents) ? agents.length : 0 });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -319,7 +363,7 @@ app.get('/api/freshdesk/agents/:id(\\d+)', requireConfig, async (req, res) => {
     cache.set(cacheKey, agent, TTL.agents);
     res.json({ agent, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -337,7 +381,7 @@ app.get('/api/freshdesk/groups', requireConfig, async (req, res) => {
     cache.set('groups', groups, TTL.agents); // same TTL as agents
     res.json({ groups, _cached: false, count: groups.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -353,7 +397,7 @@ app.get('/api/freshdesk/groups/:id(\\d+)', requireConfig, async (req, res) => {
     cache.set(cacheKey, group, TTL.agents);
     res.json({ group, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -373,7 +417,7 @@ app.get('/api/freshdesk/companies', requireConfig, async (req, res) => {
     cache.set('companies', data, TTL.companies);
     res.json({ ...data, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -387,7 +431,7 @@ app.get('/api/freshdesk/companies/raw', requireConfig, async (req, res) => {
     cache.set('companies_raw', companies, TTL.companies);
     res.json({ companies, _cached: false, count: companies.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -403,7 +447,7 @@ app.get('/api/freshdesk/companies/:id(\\d+)', requireConfig, async (req, res) =>
     cache.set(cacheKey, company, TTL.companies);
     res.json({ company, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -415,7 +459,7 @@ app.get('/api/freshdesk/companies/autocomplete', requireConfig, async (req, res)
     const companies = await freshdesk.autocompleteCompanies(name);
     res.json({ companies, count: Array.isArray(companies) ? companies.length : 0 });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -433,7 +477,7 @@ app.get('/api/freshdesk/search/companies', requireConfig, async (req, res) => {
     cache.set(cacheKey, data, TTL.search);
     res.json({ ...data, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -452,7 +496,7 @@ app.get('/api/freshdesk/csat/surveys', requireConfig, async (req, res) => {
     cache.set('csat_surveys', data, TTL.satisfaction);
     res.json({ surveys: data, _cached: false, count: data.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -471,7 +515,7 @@ app.get('/api/freshdesk/sla_policies', requireConfig, async (req, res) => {
     cache.set('sla_policies', data, 60 * 60); // 1 hour — rarely changes
     res.json({ sla_policies: data, _cached: false, count: data.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -489,7 +533,7 @@ app.get('/api/freshdesk/ticket_fields', requireConfig, async (req, res) => {
     cache.set('ticket_fields', fields, 60 * 60); // 1 hour
     res.json({ ticket_fields: fields, _cached: false, count: fields.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -503,7 +547,7 @@ app.get('/api/freshdesk/time_entries', requireConfig, async (req, res) => {
     cache.set('all_time_entries', entries, TTL.time_entries);
     res.json({ time_entries: entries, _cached: false, count: entries.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -518,7 +562,7 @@ app.get('/api/freshdesk/products', requireConfig, async (req, res) => {
     cache.set('products', data, 60 * 60);
     res.json({ products: data, _cached: false, count: data.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -533,7 +577,7 @@ app.get('/api/freshdesk/business_hours', requireConfig, async (req, res) => {
     cache.set('business_hours', data, 60 * 60);
     res.json({ business_hours: data, _cached: false, count: data.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -548,7 +592,7 @@ app.get('/api/freshdesk/email_configs', requireConfig, async (req, res) => {
     cache.set('email_configs', data, 60 * 60);
     res.json({ email_configs: data, _cached: false, count: data.length });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -562,7 +606,7 @@ app.get('/api/freshdesk/settings/helpdesk', requireConfig, async (req, res) => {
     cache.set('helpdesk_settings', settings, 60 * 60);
     res.json({ settings, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 
@@ -592,7 +636,7 @@ app.get('/api/freshdesk/stats', requireConfig, async (req, res) => {
     cache.set('stats', data, TTL.stats);
     res.json({ ...data, _cached: false });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+    handleError(res, err);
   }
 });
 

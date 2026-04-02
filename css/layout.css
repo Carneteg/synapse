@@ -192,6 +192,11 @@ body { display: flex; min-height: 100vh; }
 }
 .data-indicator.demo .data-indicator-dot { background: var(--text-muted); }
 .data-indicator.live .data-indicator-dot { background: var(--green); }
+.data-indicator.error {
+  color: var(--red); background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.3);
+}
+.data-indicator.error .data-indicator-dot { background: var(--red); }
 
 /* ── PAGE CONTAINER ── */
 #page-container { flex: 1; }

@@ -1,13 +1,38 @@
 /**
  * freshdesk.js — Authenticated Freshdesk API client
- * Handles auth, errors, pagination, rate limiting.
+ * Handles auth, errors, pagination, rate limiting with exponential backoff.
  * Covers: tickets, agents, groups, companies, conversations,
  *         CSAT, SLA policies, and supporting data endpoints.
  */
 
-// ── Rate-limit state ──
-let rateLimitRemaining = null;
-let rateLimitRetryAfter = 0;
+// ── Rate-limit tracking ──
+const rateLimit = {
+  remaining: null,
+  used: null,
+  total: null,
+  retryAfter: 0,  // timestamp (ms) when we can retry
+};
+
+// ── Exponential backoff config ──
+const BACKOFF = {
+  initial: 1000,   // 1s
+  max: 32000,      // 32s
+  factor: 2,
+  maxRetries: 5,
+};
+
+// ── Custom error class ──
+class FreshdeskError extends Error {
+  constructor(status, statusText, detail, path) {
+    super(`Freshdesk API ${status}: ${statusText}`);
+    this.name = 'FreshdeskError';
+    this.status = status;
+    this.statusText = statusText;
+    this.detail = detail;
+    this.path = path;
+    this.retryable = status === 429 || status >= 500;
+  }
+}
 
 function getConfig() {
   const domain = process.env.FRESHDESK_DOMAIN;
@@ -29,46 +54,117 @@ function sleep(ms) {
 }
 
 /**
- * Authenticated GET request with rate-limit handling.
+ * Core fetch with rate-limit header tracking.
+ * Does NOT retry — that's handled by getWithRetry().
+ * Returns { data, status } on success. Throws FreshdeskError on failure.
  */
-async function get(path) {
+async function rawGet(path) {
   const cfg = getConfig();
-  if (!cfg) throw new Error('Freshdesk credentials not configured');
+  if (!cfg) throw new FreshdeskError(0, 'Not Configured', 'Freshdesk credentials not configured', path);
 
-  if (rateLimitRetryAfter > Date.now()) {
-    const waitMs = rateLimitRetryAfter - Date.now();
-    console.log(`[freshdesk] Rate limited, waiting ${Math.ceil(waitMs / 1000)}s...`);
+  // Pre-flight: wait if we know we're rate-limited
+  if (rateLimit.retryAfter > Date.now()) {
+    const waitMs = rateLimit.retryAfter - Date.now();
+    console.log(`[freshdesk] Pre-flight rate-limit wait: ${Math.ceil(waitMs / 1000)}s`);
     await sleep(waitMs);
   }
 
   const url = `${cfg.baseUrl}${path}`;
-  const res = await fetch(url, {
-    headers: {
-      'Authorization': cfg.auth,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  const remaining = res.headers.get('x-ratelimit-remaining');
-  if (remaining !== null) rateLimitRemaining = parseInt(remaining, 10);
-
-  if (res.status === 429) {
-    const retryAfter = parseInt(res.headers.get('retry-after') || '60', 10);
-    rateLimitRetryAfter = Date.now() + retryAfter * 1000;
-    console.warn(`[freshdesk] 429 rate limited. Retry after ${retryAfter}s`);
-    await sleep(retryAfter * 1000);
-    return get(path);
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: {
+        'Authorization': cfg.auth,
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (networkErr) {
+    throw new FreshdeskError(0, 'Network Error', networkErr.message, path);
   }
 
+  // ── Track rate-limit headers on every response ──
+  const rlRemaining = res.headers.get('x-ratelimit-remaining');
+  const rlUsed = res.headers.get('x-ratelimit-used-currentrequest') || res.headers.get('x-ratelimit-used');
+  const rlTotal = res.headers.get('x-ratelimit-total');
+
+  if (rlRemaining !== null) rateLimit.remaining = parseInt(rlRemaining, 10);
+  if (rlUsed !== null)      rateLimit.used = parseInt(rlUsed, 10);
+  if (rlTotal !== null)     rateLimit.total = parseInt(rlTotal, 10);
+
+  // ── Log when running low ──
+  if (rateLimit.remaining !== null && rateLimit.remaining < 20) {
+    console.warn(`[freshdesk] Rate limit low: ${rateLimit.remaining} remaining of ${rateLimit.total || '?'}`);
+  }
+
+  // ── Handle error statuses ──
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    const err = new Error(`Freshdesk API ${res.status}: ${res.statusText}`);
-    err.status = res.status;
-    err.detail = body.slice(0, 500);
-    throw err;
+
+    // 429: set retryAfter from header
+    if (res.status === 429) {
+      const retryAfterSec = parseInt(res.headers.get('retry-after') || '60', 10);
+      rateLimit.retryAfter = Date.now() + retryAfterSec * 1000;
+      console.warn(`[freshdesk] 429 rate limited on ${path}. Retry-After: ${retryAfterSec}s`);
+    }
+
+    throw new FreshdeskError(res.status, res.statusText, body.slice(0, 500), path);
   }
 
   return res.json();
+}
+
+/**
+ * GET with exponential backoff for retryable errors (429, 5xx).
+ * Non-retryable errors (400, 401, 403, 404) throw immediately.
+ */
+async function get(path) {
+  let lastErr;
+  let delay = BACKOFF.initial;
+
+  for (let attempt = 0; attempt <= BACKOFF.maxRetries; attempt++) {
+    try {
+      return await rawGet(path);
+    } catch (err) {
+      lastErr = err;
+
+      // ── Non-retryable errors: throw immediately ──
+      if (!err.retryable) {
+        // 400: Bad request — log and throw
+        if (err.status === 400) {
+          console.error(`[freshdesk] 400 Bad Request on ${path}: ${err.detail}`);
+        }
+        // 401: Invalid API key
+        if (err.status === 401) {
+          console.error(`[freshdesk] 401 Unauthorized — API key is invalid`);
+        }
+        // 403: Insufficient permissions
+        if (err.status === 403) {
+          console.error(`[freshdesk] 403 Forbidden on ${path} — insufficient permissions`);
+        }
+        // 404: Not found
+        if (err.status === 404) {
+          console.warn(`[freshdesk] 404 Not Found: ${path}`);
+        }
+        throw err;
+      }
+
+      // ── Retryable: backoff ──
+      if (attempt < BACKOFF.maxRetries) {
+        // For 429, use retry-after if available (already set in rawGet)
+        const waitMs = err.status === 429
+          ? Math.max(delay, (rateLimit.retryAfter - Date.now()))
+          : delay;
+
+        console.warn(`[freshdesk] ${err.status} on ${path} — retry ${attempt + 1}/${BACKOFF.maxRetries} in ${Math.ceil(waitMs / 1000)}s`);
+        await sleep(Math.max(waitMs, 100));
+        delay = Math.min(delay * BACKOFF.factor, BACKOFF.max);
+      }
+    }
+  }
+
+  // All retries exhausted
+  console.error(`[freshdesk] All ${BACKOFF.maxRetries} retries exhausted for ${path}`);
+  throw lastErr;
 }
 
 /**
@@ -92,7 +188,7 @@ async function paginate(path, maxPages = 10) {
 }
 
 /**
- * Validate connection by fetching 1 agent.
+ * Validate connection.
  */
 async function testConnection() {
   const cfg = getConfig();
@@ -100,9 +196,16 @@ async function testConnection() {
 
   try {
     await get('/agents?per_page=1');
-    return { ok: true, domain: cfg.domain, rateLimitRemaining };
+    return { ok: true, domain: cfg.domain, rateLimit: { ...rateLimit, retryAfter: undefined } };
   } catch (err) {
-    return { ok: false, error: err.message };
+    return {
+      ok: false,
+      error: err.message,
+      status: err.status,
+      hint: err.status === 401 ? 'Check your FRESHDESK_API_KEY in .env'
+          : err.status === 403 ? 'API key lacks required permissions'
+          : undefined,
+    };
   }
 }
 
@@ -148,60 +251,25 @@ async function getSatisfactionRatings(ticketId) {
 // AGENTS
 // ─────────────────────────────────────────────────────────────────────
 
-/** List all agents (paginated). */
-async function listAgents() {
-  return paginate('/agents');
-}
-
-/** Get a single agent by ID. */
-async function getAgent(id) {
-  return get(`/agents/${id}`);
-}
-
-/** Get the currently authenticated agent. */
-async function getMe() {
-  return get('/agents/me');
-}
-
-/** Autocomplete agents by search term. */
-async function autocompleteAgents(term) {
-  return get(`/agents/autocomplete?term=${encodeURIComponent(term)}`);
-}
+async function listAgents()              { return paginate('/agents'); }
+async function getAgent(id)              { return get(`/agents/${id}`); }
+async function getMe()                   { return get('/agents/me'); }
+async function autocompleteAgents(term)  { return get(`/agents/autocomplete?term=${encodeURIComponent(term)}`); }
 
 // ─────────────────────────────────────────────────────────────────────
 // GROUPS
 // ─────────────────────────────────────────────────────────────────────
 
-/** List all groups (paginated). */
-async function listGroups() {
-  return paginate('/groups');
-}
-
-/** Get a single group by ID. */
-async function getGroup(id) {
-  return get(`/groups/${id}`);
-}
+async function listGroups()  { return paginate('/groups'); }
+async function getGroup(id)  { return get(`/groups/${id}`); }
 
 // ─────────────────────────────────────────────────────────────────────
 // COMPANIES
 // ─────────────────────────────────────────────────────────────────────
 
-/** List all companies (paginated). */
-async function listCompanies() {
-  return paginate('/companies');
-}
-
-/** Get a single company by ID. */
-async function getCompany(id) {
-  return get(`/companies/${id}`);
-}
-
-/** Autocomplete companies by name. */
-async function autocompleteCompanies(name) {
-  return get(`/companies/autocomplete?name=${encodeURIComponent(name)}`);
-}
-
-/** Search companies using Freshdesk query language. */
+async function listCompanies()                { return paginate('/companies'); }
+async function getCompany(id)                 { return get(`/companies/${id}`); }
+async function autocompleteCompanies(name)    { return get(`/companies/autocomplete?name=${encodeURIComponent(name)}`); }
 async function searchCompanies(query) {
   const encoded = encodeURIComponent(`"${query}"`);
   const data = await get(`/search/companies?query=${encoded}`);
@@ -209,56 +277,17 @@ async function searchCompanies(query) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// CSAT
+// CSAT / SLA / SUPPORTING
 // ─────────────────────────────────────────────────────────────────────
 
-/** List CSAT surveys. */
-async function listCSATSurveys() {
-  return get('/customer-satisfaction/surveys');
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// SLA POLICIES
-// ─────────────────────────────────────────────────────────────────────
-
-/** List all SLA policies. */
-async function listSLAPolicies() {
-  return get('/sla_policies');
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// SUPPORTING DATA
-// ─────────────────────────────────────────────────────────────────────
-
-/** List all ticket fields including custom fields. */
-async function listTicketFields() {
-  return get('/ticket_fields');
-}
-
-/** List all time entries (global, not per-ticket). */
-async function listAllTimeEntries() {
-  return paginate('/time_entries');
-}
-
-/** List products. */
-async function listProducts() {
-  return get('/products');
-}
-
-/** Get business hours configuration. */
-async function listBusinessHours() {
-  return get('/business_hours');
-}
-
-/** Get email configurations. */
-async function listEmailConfigs() {
-  return get('/email_configs');
-}
-
-/** Get helpdesk settings. */
-async function getHelpdeskSettings() {
-  return get('/settings/helpdesk');
-}
+async function listCSATSurveys()     { return get('/customer-satisfaction/surveys'); }
+async function listSLAPolicies()     { return get('/sla_policies'); }
+async function listTicketFields()    { return get('/ticket_fields'); }
+async function listAllTimeEntries()  { return paginate('/time_entries'); }
+async function listProducts()        { return get('/products'); }
+async function listBusinessHours()   { return get('/business_hours'); }
+async function listEmailConfigs()    { return get('/email_configs'); }
+async function getHelpdeskSettings() { return get('/settings/helpdesk'); }
 
 // ─────────────────────────────────────────────────────────────────────
 // EXPORTS
@@ -267,7 +296,8 @@ async function getHelpdeskSettings() {
 module.exports = {
   // Core
   get, paginate, testConnection, isConfigured, getConfig,
-  getRateLimitRemaining: () => rateLimitRemaining,
+  FreshdeskError,
+  getRateLimit: () => ({ ...rateLimit, retryAfter: rateLimit.retryAfter > Date.now() ? rateLimit.retryAfter : null }),
 
   // Tickets
   listTickets, getTicket, searchTickets,
@@ -282,13 +312,8 @@ module.exports = {
   // Companies
   listCompanies, getCompany, autocompleteCompanies, searchCompanies,
 
-  // CSAT
-  listCSATSurveys,
-
-  // SLA
-  listSLAPolicies,
-
-  // Supporting
-  listTicketFields, listAllTimeEntries, listProducts,
-  listBusinessHours, listEmailConfigs, getHelpdeskSettings,
+  // CSAT / SLA / Supporting
+  listCSATSurveys, listSLAPolicies, listTicketFields,
+  listAllTimeEntries, listProducts, listBusinessHours,
+  listEmailConfigs, getHelpdeskSettings,
 };
