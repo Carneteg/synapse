@@ -128,6 +128,55 @@ body { display: flex; min-height: 100vh; }
   flex-shrink: 0;
 }
 
+/* ── DATE RANGE PICKER (topbar) ── */
+.date-range-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.date-range-label {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.date-range-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  outline: none;
+  width: 120px;
+}
+.date-range-input:focus {
+  border-color: var(--accent);
+}
+/* Webkit date input icon color */
+.date-range-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+.date-range-apply {
+  font-size: 11px !important;
+  padding: 3px 10px !important;
+}
+.date-range-clear {
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  color: var(--red) !important;
+}
+.date-range-active {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px rgba(79, 142, 247, 0.2);
+}
+@media print { .date-range-picker { display: none !important; } }
+
 /* ── BACK BUTTON ── */
 .back-btn {
   background: none; border: 1px solid var(--border);

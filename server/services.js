@@ -14,16 +14,35 @@ let _activeGroupId = null;
 function setGroupFilter(groupId) { _activeGroupId = groupId; }
 function getGroupFilter() { return _activeGroupId; }
 
-/** Fetch tickets with automatic group_id filter applied. */
+// ── DATE RANGE FILTER ──
+let _dateFrom = null;
+let _dateTo = null;
+
+function setDateRange(from, to) { _dateFrom = from || null; _dateTo = to || null; }
+function getDateRange() { return { from: _dateFrom, to: _dateTo }; }
+
+/** Fetch tickets with automatic group + date range filters applied. */
 async function fetchTickets(opts = {}) {
+  // Apply module-level date range if no explicit updated_since is set
+  if (_dateFrom && !opts.updated_since) {
+    opts.updated_since = _dateFrom;
+  }
+
+  let tickets = await freshdesk.listTickets(opts);
+
+  // Client-side group filter
   const gid = getGroupFilter();
   if (gid) {
-    // Freshdesk filter syntax: pre-defined filters or custom query
-    // We filter client-side since listTickets may not support group_id in filter param
-    const tickets = await fetchTickets(opts);
-    return tickets.filter(t => t.group_id === gid);
+    tickets = tickets.filter(t => t.group_id === gid);
   }
-  return fetchTickets(opts);
+
+  // Client-side "to" date filter (Freshdesk API only supports updated_since, not until)
+  if (_dateTo) {
+    const toMs = new Date(_dateTo).getTime();
+    tickets = tickets.filter(t => new Date(t.created_at).getTime() <= toMs);
+  }
+
+  return tickets;
 }
 
 /** Filter an agents array to only those belonging to the active group. */
@@ -33,10 +52,14 @@ function filterAgentsByGroup(agents) {
   return agents.filter(a => (a.group_ids || []).includes(gid));
 }
 
-/** Cache key suffix for group-scoped caching. */
+/** Cache key suffix for group + date-range scoped caching. */
 function gk(base) {
+  let key = base;
   const gid = getGroupFilter();
-  return gid ? `${base}:g${gid}` : base;
+  if (gid) key += `:g${gid}`;
+  if (_dateFrom) key += `:f${_dateFrom.slice(0,10)}`;
+  if (_dateTo) key += `:t${_dateTo.slice(0,10)}`;
+  return key;
 }
 
 // ── TTL (seconds) ──
@@ -803,6 +826,7 @@ module.exports = {
   getCompanyHealth, getContactsByCompany, getTicketsByContact,
   // Drill-down
   getTicketDetail, getAgentTickets,
-  // Group filter
+  // Filters
   setGroupFilter, getGroupFilter,
+  setDateRange, getDateRange,
 };
