@@ -255,4 +255,71 @@ function transformDashboardKPIs(freshdeskStats, pressingStats, churnCount, draft
   return { dashboardKPIs: kpiBase, attentionItems };
 }
 
-module.exports = { transformTickets, transformCompanies, transformAgents, transformDashboardKPIs };
+/**
+ * Transform conversations for a ticket into a clean format.
+ */
+function transformConversations(conversations) {
+  return conversations.map(c => ({
+    id: c.id,
+    incoming: c.incoming || false,
+    private: c.private || false,
+    source: c.source, // 0=Reply, 2=Note, 5=Created from fwd, 7=Phone, 8=E-Commerce
+    body_text: (c.body_text || '').slice(0, 500),
+    from_email: c.from_email || null,
+    to_emails: c.to_emails || [],
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+    user_id: c.user_id,
+    attachments: (c.attachments || []).map(a => ({
+      name: a.name,
+      size: a.size,
+      content_type: a.content_type,
+      url: a.attachment_url,
+    })),
+  }));
+}
+
+/**
+ * Transform time entries for a ticket.
+ */
+function transformTimeEntries(entries) {
+  const total = entries.reduce((sum, e) => sum + (parseFloat(e.time_spent) || 0), 0);
+  return {
+    entries: entries.map(e => ({
+      id: e.id,
+      agent_id: e.agent_id,
+      note: e.note || '',
+      time_spent: e.time_spent, // Format: "HH:MM"
+      billable: e.billable || false,
+      created_at: e.created_at,
+    })),
+    total_time_spent: total,
+    count: entries.length,
+  };
+}
+
+/**
+ * Transform satisfaction ratings for a ticket.
+ */
+function transformSatisfactionRatings(ratings) {
+  return ratings.map(r => ({
+    id: r.id,
+    survey_id: r.survey_id,
+    rating: r.ratings?.default_question, // Typically a number 1-5 or 'happy'/'sad'
+    feedback: r.feedback || null,
+    created_at: r.created_at,
+    agent_id: r.agent_id,
+    group_id: r.group_id,
+    ticket_id: r.ticket_id,
+  }));
+}
+
+module.exports = {
+  transformTickets,
+  transformCompanies,
+  transformAgents,
+  transformDashboardKPIs,
+  transformConversations,
+  transformTimeEntries,
+  transformSatisfactionRatings,
+};
