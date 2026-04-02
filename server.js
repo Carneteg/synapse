@@ -249,15 +249,125 @@ app.get('/api/freshdesk/tickets/:id(\\d+)/satisfaction_ratings', requireConfig, 
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// AGENTS
+// ─────────────────────────────────────────────────────────────────────
+
+/** GET /api/freshdesk/agents — List all agents (transformed for DATA) */
+app.get('/api/freshdesk/agents', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('agents');
+    if (cached) return res.json({ ...cached, _cached: true });
+
+    const agents = await freshdesk.listAgents();
+    const data = transform.transformAgents(agents);
+    cache.set('agents', data, TTL.agents);
+    res.json({ ...data, _cached: false });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/agents/raw — Raw agent list */
+app.get('/api/freshdesk/agents/raw', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('agents_raw');
+    if (cached) return res.json({ agents: cached, _cached: true, count: cached.length });
+
+    const agents = await freshdesk.listAgents();
+    cache.set('agents_raw', agents, TTL.agents);
+    res.json({ agents, _cached: false, count: agents.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/agents/me — Currently authenticated agent */
+app.get('/api/freshdesk/agents/me', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('agent_me');
+    if (cached) return res.json({ agent: cached, _cached: true });
+
+    const agent = await freshdesk.getMe();
+    cache.set('agent_me', agent, TTL.agents);
+    res.json({ agent, _cached: false });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/agents/autocomplete?term=... */
+app.get('/api/freshdesk/agents/autocomplete', requireConfig, async (req, res) => {
+  try {
+    const { term } = req.query;
+    if (!term) return res.status(400).json({ error: 'term parameter required' });
+    const agents = await freshdesk.autocompleteAgents(term);
+    res.json({ agents, count: Array.isArray(agents) ? agents.length : 0 });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/agents/:id — Single agent */
+app.get('/api/freshdesk/agents/:id(\\d+)', requireConfig, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cacheKey = `agent:${id}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json({ agent: cached, _cached: true });
+
+    const agent = await freshdesk.getAgent(id);
+    cache.set(cacheKey, agent, TTL.agents);
+    res.json({ agent, _cached: false });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// GROUPS
+// ─────────────────────────────────────────────────────────────────────
+
+/** GET /api/freshdesk/groups — List all groups */
+app.get('/api/freshdesk/groups', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('groups');
+    if (cached) return res.json({ groups: cached, _cached: true, count: cached.length });
+
+    const groups = await freshdesk.listGroups();
+    cache.set('groups', groups, TTL.agents); // same TTL as agents
+    res.json({ groups, _cached: false, count: groups.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/groups/:id — Single group */
+app.get('/api/freshdesk/groups/:id(\\d+)', requireConfig, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cacheKey = `group:${id}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json({ group: cached, _cached: true });
+
+    const group = await freshdesk.getGroup(id);
+    cache.set(cacheKey, group, TTL.agents);
+    res.json({ group, _cached: false });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // COMPANIES
 // ─────────────────────────────────────────────────────────────────────
 
+/** GET /api/freshdesk/companies — List all (transformed for DATA) */
 app.get('/api/freshdesk/companies', requireConfig, async (req, res) => {
   try {
     const cached = cache.get('companies');
     if (cached) return res.json({ ...cached, _cached: true });
 
-    const companies = await freshdesk.paginate('/companies');
+    const companies = await freshdesk.listCompanies();
     const rawTickets = await freshdesk.listTickets({ order_by: 'created_at', order_type: 'desc', include: 'stats' });
     const data = transform.transformCompanies(companies, rawTickets);
     cache.set('companies', data, TTL.companies);
@@ -267,19 +377,190 @@ app.get('/api/freshdesk/companies', requireConfig, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// AGENTS
-// ─────────────────────────────────────────────────────────────────────
-
-app.get('/api/freshdesk/agents', requireConfig, async (req, res) => {
+/** GET /api/freshdesk/companies/raw — Raw company list */
+app.get('/api/freshdesk/companies/raw', requireConfig, async (req, res) => {
   try {
-    const cached = cache.get('agents');
+    const cached = cache.get('companies_raw');
+    if (cached) return res.json({ companies: cached, _cached: true, count: cached.length });
+
+    const companies = await freshdesk.listCompanies();
+    cache.set('companies_raw', companies, TTL.companies);
+    res.json({ companies, _cached: false, count: companies.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/companies/:id — Single company */
+app.get('/api/freshdesk/companies/:id(\\d+)', requireConfig, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cacheKey = `company:${id}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json({ company: cached, _cached: true });
+
+    const company = await freshdesk.getCompany(id);
+    cache.set(cacheKey, company, TTL.companies);
+    res.json({ company, _cached: false });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/companies/autocomplete?name=... */
+app.get('/api/freshdesk/companies/autocomplete', requireConfig, async (req, res) => {
+  try {
+    const { name } = req.query;
+    if (!name) return res.status(400).json({ error: 'name parameter required' });
+    const companies = await freshdesk.autocompleteCompanies(name);
+    res.json({ companies, count: Array.isArray(companies) ? companies.length : 0 });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/search/companies?query=... */
+app.get('/api/freshdesk/search/companies', requireConfig, async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) return res.status(400).json({ error: 'query parameter required' });
+
+    const cacheKey = `search_co:${Buffer.from(query).toString('base64').slice(0, 64)}`;
+    const cached = cache.get(cacheKey);
     if (cached) return res.json({ ...cached, _cached: true });
 
-    const agents = await freshdesk.paginate('/agents');
-    const data = transform.transformAgents(agents);
-    cache.set('agents', data, TTL.agents);
+    const data = await freshdesk.searchCompanies(query);
+    cache.set(cacheKey, data, TTL.search);
     res.json({ ...data, _cached: false });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// CSAT SURVEYS
+// ─────────────────────────────────────────────────────────────────────
+
+/** GET /api/freshdesk/csat/surveys — List CSAT surveys */
+app.get('/api/freshdesk/csat/surveys', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('csat_surveys');
+    if (cached) return res.json({ surveys: cached, _cached: true });
+
+    const surveys = await freshdesk.listCSATSurveys();
+    const data = Array.isArray(surveys) ? surveys : [surveys].filter(Boolean);
+    cache.set('csat_surveys', data, TTL.satisfaction);
+    res.json({ surveys: data, _cached: false, count: data.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// SLA POLICIES
+// ─────────────────────────────────────────────────────────────────────
+
+/** GET /api/freshdesk/sla_policies */
+app.get('/api/freshdesk/sla_policies', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('sla_policies');
+    if (cached) return res.json({ sla_policies: cached, _cached: true });
+
+    const policies = await freshdesk.listSLAPolicies();
+    const data = Array.isArray(policies) ? policies : policies?.sla_policies || [policies].filter(Boolean);
+    cache.set('sla_policies', data, 60 * 60); // 1 hour — rarely changes
+    res.json({ sla_policies: data, _cached: false, count: data.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// SUPPORTING DATA
+// ─────────────────────────────────────────────────────────────────────
+
+/** GET /api/freshdesk/ticket_fields */
+app.get('/api/freshdesk/ticket_fields', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('ticket_fields');
+    if (cached) return res.json({ ticket_fields: cached, _cached: true, count: cached.length });
+
+    const fields = await freshdesk.listTicketFields();
+    cache.set('ticket_fields', fields, 60 * 60); // 1 hour
+    res.json({ ticket_fields: fields, _cached: false, count: fields.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/time_entries — Global time entries */
+app.get('/api/freshdesk/time_entries', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('all_time_entries');
+    if (cached) return res.json({ time_entries: cached, _cached: true, count: cached.length });
+
+    const entries = await freshdesk.listAllTimeEntries();
+    cache.set('all_time_entries', entries, TTL.time_entries);
+    res.json({ time_entries: entries, _cached: false, count: entries.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/products */
+app.get('/api/freshdesk/products', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('products');
+    if (cached) return res.json({ products: cached, _cached: true, count: cached.length });
+
+    const products = await freshdesk.listProducts();
+    const data = Array.isArray(products) ? products : [products].filter(Boolean);
+    cache.set('products', data, 60 * 60);
+    res.json({ products: data, _cached: false, count: data.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/business_hours */
+app.get('/api/freshdesk/business_hours', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('business_hours');
+    if (cached) return res.json({ business_hours: cached, _cached: true });
+
+    const hours = await freshdesk.listBusinessHours();
+    const data = Array.isArray(hours) ? hours : hours?.business_hours || [hours].filter(Boolean);
+    cache.set('business_hours', data, 60 * 60);
+    res.json({ business_hours: data, _cached: false, count: data.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/email_configs */
+app.get('/api/freshdesk/email_configs', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('email_configs');
+    if (cached) return res.json({ email_configs: cached, _cached: true });
+
+    const configs = await freshdesk.listEmailConfigs();
+    const data = Array.isArray(configs) ? configs : [configs].filter(Boolean);
+    cache.set('email_configs', data, 60 * 60);
+    res.json({ email_configs: data, _cached: false, count: data.length });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+});
+
+/** GET /api/freshdesk/settings/helpdesk */
+app.get('/api/freshdesk/settings/helpdesk', requireConfig, async (req, res) => {
+  try {
+    const cached = cache.get('helpdesk_settings');
+    if (cached) return res.json({ settings: cached, _cached: true });
+
+    const settings = await freshdesk.getHelpdeskSettings();
+    cache.set('helpdesk_settings', settings, 60 * 60);
+    res.json({ settings, _cached: false });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message, detail: err.detail });
   }
@@ -347,18 +628,44 @@ app.listen(PORT, () => {
     console.log('  → Copy .env.example to .env and add your credentials');
   }
   console.log('\nProxy routes:');
-  console.log('  GET  /api/freshdesk/status');
-  console.log('  GET  /api/freshdesk/tickets[?filter=&order_by=&include=&updated_since=]');
-  console.log('  GET  /api/freshdesk/tickets/raw');
-  console.log('  GET  /api/freshdesk/tickets/:id[?include=]');
-  console.log('  GET  /api/freshdesk/search/tickets?query=...');
-  console.log('  GET  /api/freshdesk/tickets/:id/conversations');
-  console.log('  GET  /api/freshdesk/tickets/:id/time_entries');
-  console.log('  GET  /api/freshdesk/tickets/:id/satisfaction_ratings');
-  console.log('  GET  /api/freshdesk/companies');
-  console.log('  GET  /api/freshdesk/agents');
-  console.log('  GET  /api/freshdesk/stats');
-  console.log('  GET  /api/freshdesk/cache');
-  console.log('  POST /api/freshdesk/cache/clear');
-  console.log('  DEL  /api/freshdesk/cache/:key');
+  console.log('  Tickets:');
+  console.log('    GET  /api/freshdesk/tickets[?filter=&order_by=&include=&updated_since=]');
+  console.log('    GET  /api/freshdesk/tickets/raw');
+  console.log('    GET  /api/freshdesk/tickets/:id[?include=]');
+  console.log('    GET  /api/freshdesk/search/tickets?query=...');
+  console.log('    GET  /api/freshdesk/tickets/:id/conversations');
+  console.log('    GET  /api/freshdesk/tickets/:id/time_entries');
+  console.log('    GET  /api/freshdesk/tickets/:id/satisfaction_ratings');
+  console.log('  Agents:');
+  console.log('    GET  /api/freshdesk/agents         (transformed)');
+  console.log('    GET  /api/freshdesk/agents/raw');
+  console.log('    GET  /api/freshdesk/agents/me');
+  console.log('    GET  /api/freshdesk/agents/autocomplete?term=...');
+  console.log('    GET  /api/freshdesk/agents/:id');
+  console.log('  Groups:');
+  console.log('    GET  /api/freshdesk/groups');
+  console.log('    GET  /api/freshdesk/groups/:id');
+  console.log('  Companies:');
+  console.log('    GET  /api/freshdesk/companies       (transformed)');
+  console.log('    GET  /api/freshdesk/companies/raw');
+  console.log('    GET  /api/freshdesk/companies/:id');
+  console.log('    GET  /api/freshdesk/companies/autocomplete?name=...');
+  console.log('    GET  /api/freshdesk/search/companies?query=...');
+  console.log('  CSAT & SLA:');
+  console.log('    GET  /api/freshdesk/csat/surveys');
+  console.log('    GET  /api/freshdesk/sla_policies');
+  console.log('  Supporting:');
+  console.log('    GET  /api/freshdesk/ticket_fields');
+  console.log('    GET  /api/freshdesk/time_entries');
+  console.log('    GET  /api/freshdesk/products');
+  console.log('    GET  /api/freshdesk/business_hours');
+  console.log('    GET  /api/freshdesk/email_configs');
+  console.log('    GET  /api/freshdesk/settings/helpdesk');
+  console.log('  Aggregated:');
+  console.log('    GET  /api/freshdesk/stats');
+  console.log('    GET  /api/freshdesk/status');
+  console.log('  Cache:');
+  console.log('    GET  /api/freshdesk/cache');
+  console.log('    POST /api/freshdesk/cache/clear');
+  console.log('    DEL  /api/freshdesk/cache/:key');
 });

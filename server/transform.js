@@ -12,6 +12,9 @@ const PRIORITY = { LOW: 1, MEDIUM: 2, HIGH: 3, URGENT: 4 };
 const PRIORITY_LABEL = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent' };
 const SOURCE = { EMAIL: 1, PORTAL: 2, PHONE: 3, CHAT: 7, BOT: 9 };
 const SOURCE_LABEL = { 1: 'Email', 2: 'Portal', 3: 'Phone', 7: 'Chat', 9: 'Bot' };
+const CSAT_LABEL = { 1: 'Unhappy', 2: 'Neutral', 3: 'Happy' };
+const TICKET_SCOPE = { GLOBAL: 1, GROUP: 2, RESTRICTED: 3 };
+const TICKET_SCOPE_LABEL = { 1: 'Global', 2: 'Group', 3: 'Restricted' };
 
 function timeAgo(dateStr) {
   if (!dateStr) return '—';
@@ -284,9 +287,16 @@ function transformAgents(agents) {
       return {
         initials,
         name,
-        tickets: a.ticket_scope || 0,
-        score: 70 + Math.floor(Math.random() * 25), // No real QA score in Freshdesk API
+        email: a.contact.email || '',
+        tickets: 0, // Not available from agent endpoint — needs ticket aggregation
+        score: 0,
         flags: 0,
+        available: a.available || false,
+        occasional: a.occasional || false,
+        scope: TICKET_SCOPE_LABEL[a.ticket_scope] || 'Unknown',
+        group_ids: a.group_ids || [],
+        role_ids: a.role_ids || [],
+        id: a.id,
       };
     });
 
@@ -380,16 +390,20 @@ function transformTimeEntries(entries) {
  * Transform satisfaction ratings for a ticket.
  */
 function transformSatisfactionRatings(ratings) {
-  return ratings.map(r => ({
-    id: r.id,
-    survey_id: r.survey_id,
-    rating: r.ratings?.default_question, // Typically a number 1-5 or 'happy'/'sad'
-    feedback: r.feedback || null,
-    created_at: r.created_at,
-    agent_id: r.agent_id,
-    group_id: r.group_id,
-    ticket_id: r.ticket_id,
-  }));
+  return ratings.map(r => {
+    const ratingValue = r.ratings?.default_question;
+    return {
+      id: r.id,
+      survey_id: r.survey_id,
+      rating: ratingValue,
+      rating_label: CSAT_LABEL[ratingValue] || String(ratingValue || '—'),
+      feedback: r.feedback || null,
+      created_at: r.created_at,
+      agent_id: r.agent_id,
+      group_id: r.group_id,
+      ticket_id: r.ticket_id,
+    };
+  });
 }
 
 module.exports = {

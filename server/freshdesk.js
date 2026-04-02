@@ -1,6 +1,8 @@
 /**
  * freshdesk.js — Authenticated Freshdesk API client
- * Handles auth, errors, pagination, rate limiting, and all ticket endpoints.
+ * Handles auth, errors, pagination, rate limiting.
+ * Covers: tickets, agents, groups, companies, conversations,
+ *         CSAT, SLA policies, and supporting data endpoints.
  */
 
 // ── Rate-limit state ──
@@ -22,23 +24,17 @@ function isConfigured() {
   return !!getConfig();
 }
 
-/**
- * Sleep for ms. Used for rate-limit backoff.
- */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
- * Authenticated GET request to Freshdesk API.
- * Handles rate limiting (429) with automatic retry.
- * Returns parsed JSON. Throws on HTTP errors.
+ * Authenticated GET request with rate-limit handling.
  */
 async function get(path) {
   const cfg = getConfig();
   if (!cfg) throw new Error('Freshdesk credentials not configured');
 
-  // If we know we're rate-limited, wait before making the request
   if (rateLimitRetryAfter > Date.now()) {
     const waitMs = rateLimitRetryAfter - Date.now();
     console.log(`[freshdesk] Rate limited, waiting ${Math.ceil(waitMs / 1000)}s...`);
@@ -53,17 +49,15 @@ async function get(path) {
     },
   });
 
-  // Track rate-limit headers
   const remaining = res.headers.get('x-ratelimit-remaining');
   if (remaining !== null) rateLimitRemaining = parseInt(remaining, 10);
 
-  // Handle 429 Too Many Requests
   if (res.status === 429) {
     const retryAfter = parseInt(res.headers.get('retry-after') || '60', 10);
     rateLimitRetryAfter = Date.now() + retryAfter * 1000;
     console.warn(`[freshdesk] 429 rate limited. Retry after ${retryAfter}s`);
     await sleep(retryAfter * 1000);
-    return get(path); // Retry once
+    return get(path);
   }
 
   if (!res.ok) {
@@ -78,10 +72,7 @@ async function get(path) {
 }
 
 /**
- * Auto-paginate a list endpoint. Freshdesk max per_page is 100.
- * Returns all results concatenated.
- * @param {string} path - API path (may include query params)
- * @param {number} maxPages - Safety limit on pages to fetch
+ * Auto-paginate a list endpoint (max 100 per page).
  */
 async function paginate(path, maxPages = 10) {
   const sep = path.includes('?') ? '&' : '?';
@@ -90,7 +81,6 @@ async function paginate(path, maxPages = 10) {
   for (let page = 1; page <= maxPages; page++) {
     const data = await get(`${path}${sep}per_page=100&page=${page}`);
     if (!Array.isArray(data)) {
-      // Search endpoint returns { total, results }
       if (data.results) return data.results;
       return [data];
     }
@@ -117,19 +107,9 @@ async function testConnection() {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// TICKET ENDPOINTS
+// TICKETS
 // ─────────────────────────────────────────────────────────────────────
 
-/**
- * List tickets with optional query parameters.
- * @param {Object} opts
- * @param {string} opts.filter - Predefined filter: new_and_my_open, watching, spam, deleted
- * @param {string} opts.updated_since - ISO date string YYYY-MM-DDTHH:MM:SSZ
- * @param {string} opts.order_by - Field to order by: created_at, due_by, updated_at
- * @param {string} opts.order_type - asc or desc
- * @param {string} opts.include - Comma-separated: requester, stats, description, company
- * @param {number} opts.maxPages - Max pages to fetch (default 10)
- */
 async function listTickets(opts = {}) {
   const params = [];
   if (opts.filter)        params.push(`filter=${opts.filter}`);
@@ -137,58 +117,147 @@ async function listTickets(opts = {}) {
   if (opts.order_by)      params.push(`order_by=${opts.order_by}`);
   if (opts.order_type)    params.push(`order_type=${opts.order_type}`);
   if (opts.include)       params.push(`include=${opts.include}`);
-
   const qs = params.length > 0 ? '?' + params.join('&') : '';
   return paginate(`/tickets${qs}`, opts.maxPages || 10);
 }
 
-/**
- * Get a single ticket by ID.
- * @param {number} id - Ticket ID
- * @param {string} include - Optional: requester, stats, description, company
- */
 async function getTicket(id, include) {
   const qs = include ? `?include=${include}` : '';
   return get(`/tickets/${id}${qs}`);
 }
 
-/**
- * Search tickets using Freshdesk query language.
- * Query examples:
- *   "status:2 OR status:3"
- *   "priority:4 AND created_at:>'2025-01-01'"
- *   "tag:'billing'"
- * @param {string} query - Freshdesk search query string
- */
 async function searchTickets(query) {
   const encoded = encodeURIComponent(`"${query}"`);
   const data = await get(`/search/tickets?query=${encoded}`);
-  // Search returns { total, results }
   return { total: data.total || 0, results: data.results || [] };
 }
 
-/**
- * List conversations on a ticket.
- * @param {number} ticketId
- */
 async function getConversations(ticketId) {
   return paginate(`/tickets/${ticketId}/conversations`, 5);
 }
 
-/**
- * List time entries on a ticket.
- * @param {number} ticketId
- */
 async function getTimeEntries(ticketId) {
   return get(`/tickets/${ticketId}/time_entries`);
 }
 
-/**
- * Get satisfaction ratings for a ticket.
- * @param {number} ticketId
- */
 async function getSatisfactionRatings(ticketId) {
   return get(`/tickets/${ticketId}/satisfaction_ratings`);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// AGENTS
+// ─────────────────────────────────────────────────────────────────────
+
+/** List all agents (paginated). */
+async function listAgents() {
+  return paginate('/agents');
+}
+
+/** Get a single agent by ID. */
+async function getAgent(id) {
+  return get(`/agents/${id}`);
+}
+
+/** Get the currently authenticated agent. */
+async function getMe() {
+  return get('/agents/me');
+}
+
+/** Autocomplete agents by search term. */
+async function autocompleteAgents(term) {
+  return get(`/agents/autocomplete?term=${encodeURIComponent(term)}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// GROUPS
+// ─────────────────────────────────────────────────────────────────────
+
+/** List all groups (paginated). */
+async function listGroups() {
+  return paginate('/groups');
+}
+
+/** Get a single group by ID. */
+async function getGroup(id) {
+  return get(`/groups/${id}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// COMPANIES
+// ─────────────────────────────────────────────────────────────────────
+
+/** List all companies (paginated). */
+async function listCompanies() {
+  return paginate('/companies');
+}
+
+/** Get a single company by ID. */
+async function getCompany(id) {
+  return get(`/companies/${id}`);
+}
+
+/** Autocomplete companies by name. */
+async function autocompleteCompanies(name) {
+  return get(`/companies/autocomplete?name=${encodeURIComponent(name)}`);
+}
+
+/** Search companies using Freshdesk query language. */
+async function searchCompanies(query) {
+  const encoded = encodeURIComponent(`"${query}"`);
+  const data = await get(`/search/companies?query=${encoded}`);
+  return { total: data.total || 0, results: data.results || [] };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// CSAT
+// ─────────────────────────────────────────────────────────────────────
+
+/** List CSAT surveys. */
+async function listCSATSurveys() {
+  return get('/customer-satisfaction/surveys');
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SLA POLICIES
+// ─────────────────────────────────────────────────────────────────────
+
+/** List all SLA policies. */
+async function listSLAPolicies() {
+  return get('/sla_policies');
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SUPPORTING DATA
+// ─────────────────────────────────────────────────────────────────────
+
+/** List all ticket fields including custom fields. */
+async function listTicketFields() {
+  return get('/ticket_fields');
+}
+
+/** List all time entries (global, not per-ticket). */
+async function listAllTimeEntries() {
+  return paginate('/time_entries');
+}
+
+/** List products. */
+async function listProducts() {
+  return get('/products');
+}
+
+/** Get business hours configuration. */
+async function listBusinessHours() {
+  return get('/business_hours');
+}
+
+/** Get email configurations. */
+async function listEmailConfigs() {
+  return get('/email_configs');
+}
+
+/** Get helpdesk settings. */
+async function getHelpdeskSettings() {
+  return get('/settings/helpdesk');
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -197,20 +266,29 @@ async function getSatisfactionRatings(ticketId) {
 
 module.exports = {
   // Core
-  get,
-  paginate,
-  testConnection,
-  isConfigured,
-  getConfig,
+  get, paginate, testConnection, isConfigured, getConfig,
+  getRateLimitRemaining: () => rateLimitRemaining,
 
   // Tickets
-  listTickets,
-  getTicket,
-  searchTickets,
-  getConversations,
-  getTimeEntries,
-  getSatisfactionRatings,
+  listTickets, getTicket, searchTickets,
+  getConversations, getTimeEntries, getSatisfactionRatings,
 
-  // Rate-limit info
-  getRateLimitRemaining: () => rateLimitRemaining,
+  // Agents
+  listAgents, getAgent, getMe, autocompleteAgents,
+
+  // Groups
+  listGroups, getGroup,
+
+  // Companies
+  listCompanies, getCompany, autocompleteCompanies, searchCompanies,
+
+  // CSAT
+  listCSATSurveys,
+
+  // SLA
+  listSLAPolicies,
+
+  // Supporting
+  listTicketFields, listAllTimeEntries, listProducts,
+  listBusinessHours, listEmailConfigs, getHelpdeskSettings,
 };
