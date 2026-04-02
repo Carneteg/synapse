@@ -1,13 +1,16 @@
 // ── QA SUMMARY ──
 const qaSummaryFn = () => `
   ${UI.sectionHead('QA Summary', 'AI-scored conversation quality',
-    `<button class="btn btn-primary">▶ New Run</button>`)}
+    `${UI.freshBadge('qa')} ${UI.tableExportBtn('qa-agents-table', 'qa-agents')} <button class="btn btn-primary">▶ New Run</button>`)}
+
+  ${UI.sourceBar('qa', 'QA Scoring Run')}
+  ${UI.staleWarning('qa', 'QA scores may be outdated — consider running a new scoring pass')}
 
   <div class="grid-4 mb-4">
-    ${UI.statCard('Tickets Scored', '342',   'This run')}
-    ${UI.statCard('Avg Score',      '78',    'Out of 100',    '', '', 'var(--green)')}
-    ${UI.statCard('Churn Flags',    '7',     'Tickets flagged', '', '', 'var(--red)')}
-    ${UI.statCard('ARR at Risk',    '4.8M',  'NOK',           '', '', 'var(--red)')}
+    ${UI.statCardFresh('Tickets Scored', '342',   'This run',       'qa')}
+    ${UI.statCardFresh('Avg Score',      '78',    'Out of 100',     'qa', '', '', 'var(--green)')}
+    ${UI.statCardFresh('Churn Flags',    '7',     'Tickets flagged','churn', '', '', 'var(--red)')}
+    ${UI.statCardFresh('ARR at Risk',    '4.8M',  'NOK',           'churn', '', '', 'var(--red)')}
   </div>
 
   <div class="grid-2">
@@ -42,13 +45,15 @@ const qaSummaryFn = () => `
 
 qaSummaryFn.afterRender = () => {
   UI.tableInit('qa-agents-table');
+  UI.tableExportBtnInit('qa-agents-table', 'qa-agents', 'QA Agent Scores');
 };
 
 Router.register('qa-summary', qaSummaryFn);
 
 // ── CHURN RISK ──
 const churnRiskFn = () => `
-  ${UI.sectionHead('Churn Risk', 'Tickets with detected cancellation signals')}
+  ${UI.sectionHead('Churn Risk', 'Tickets with detected cancellation signals',
+    UI.tableExportBtn('churn-table', 'churn-risk'))}
 
   <div class="grid-2-1">
     <div class="card">
@@ -90,6 +95,67 @@ const churnRiskFn = () => `
 
 churnRiskFn.afterRender = () => {
   UI.tableInit('churn-table');
+  UI.tableExportBtnInit('churn-table', 'churn-risk', 'Churn Risk Tickets');
 };
 
 Router.register('churn-risk', churnRiskFn);
+
+// ── QA COACHING ──
+const qaCoachingFn = () => {
+  const agents = [...(DATA.qaCoaching || [])].sort((a, b) => a.score - b.score);
+  if (agents.length === 0) return '<div class="empty-state">No coaching data available</div>';
+  const teamAvg = Math.round(agents.reduce((s, a) => s + a.score, 0) / agents.length);
+  const totalFlags = agents.reduce((s, a) => s + a.flags, 0);
+  const worst = agents[0];
+  const bestDelta = [...agents].sort((a, b) => (b.score - b.prevScore) - (a.score - a.prevScore))[0];
+  const bestDeltaVal = bestDelta.score - bestDelta.prevScore;
+
+  return `
+    ${UI.sectionHead('QA Coaching', 'Agent performance profiles with drill-down evaluations',
+      `${UI.freshBadge('qa')} ${typeof Auth !== 'undefined' && Auth.hasRole('manager') ? UI.exportDropdown({ id: 'coaching', items: [{ label: 'JSON', icon: '{ }', action: 'json' }, { label: 'Print', icon: '\u2399', action: 'print' }] }) : ''}`)}
+
+    <div class="grid-4 mb-4">
+      ${UI.statCard('Team Average', teamAvg, 'Out of 100', '', '', 'var(--accent)')}
+      ${UI.statCard('Needs Focus', worst.name, 'Score: ' + worst.score, '', '', 'var(--red)')}
+      ${UI.statCard('Total Flags', totalFlags, 'Across team', '', '', totalFlags > 3 ? 'var(--red)' : 'var(--yellow)')}
+      ${UI.statCard('Most Improved', bestDelta.name, '+' + bestDeltaVal + ' pts', '', '', 'var(--green)')}
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header">
+        <span class="card-title">Current vs Redesign</span>
+      </div>
+      <table class="table" style="font-size:13px">
+        <thead><tr><th>Feature</th><th>Current Issue</th><th>Redesign</th></tr></thead>
+        <tbody>
+          <tr><td>Score context</td><td style="color:var(--red)">Bare numbers, no tickets behind them</td><td style="color:var(--green)">Click-through: Agent &#8594; Ticket &#8594; Conversation + breakdown</td></tr>
+          <tr><td>Coaching notes</td><td style="color:var(--red)">Static text, same for all agents</td><td style="color:var(--green)">Editable per agent, persisted with timestamps</td></tr>
+          <tr><td>Worst tickets</td><td style="color:var(--red)">Not surfaced</td><td style="color:var(--green)">Sorted by score in agent drill-down, clickable</td></tr>
+          <tr><td>Agent trends</td><td style="color:var(--red)">No trend data</td><td style="color:var(--green)">Delta vs last run shown on every card</td></tr>
+          <tr><td>Dimension detail</td><td style="color:var(--red)">Only team-level averages</td><td style="color:var(--green)">Per-agent dimensions with team comparison</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-header mb-2"><span class="card-title">Agent Profiles</span><span class="text-muted" style="font-size:12px;margin-left:8px">Sorted by score (needs focus first)</span></div>
+    <div class="grid-4 mb-4" id="agent-cards">
+      ${agents.map(a => UI.agentCard(a)).join('')}
+    </div>
+  `;
+};
+
+qaCoachingFn.afterRender = () => {
+  document.querySelectorAll('.agent-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.agentId;
+      const agent = DATA.qaCoaching.find(a => a.id === id);
+      if (agent) DrillDown.open('qa-agent', agent);
+    });
+  });
+  UI.exportDropdownInit('coaching', {
+    json: () => UI.exportJSON(DATA.qaCoaching, 'qa-coaching'),
+    print: () => UI.printPage('QA Coaching'),
+  });
+};
+
+Router.register('qa-coaching', qaCoachingFn);

@@ -7,12 +7,13 @@ let dashboardRange = 'week';
 function renderDashboard() {
   const kpis = DATA.dashboardKPIs[dashboardRange];
   const totalARR = DATA.atRiskAccounts.reduce((s, a) => {
-    return s + parseFloat(a.arr);
+    return s + (parseFloat(a.arr) || 0);
   }, 0).toFixed(1);
 
   return `
   ${UI.sectionHead('Home', 'What needs your attention today',
     `<div class="dash-controls">
+      ${UI.freshBadge('stats')}
       <select class="select" id="dash-range">
         <option value="today"${dashboardRange === 'today' ? ' selected' : ''}>Today</option>
         <option value="week"${dashboardRange === 'week' ? ' selected' : ''}>This Week</option>
@@ -22,8 +23,10 @@ function renderDashboard() {
     'dashboardKPIs'
   )}
 
+  ${UI.staleWarning('stats')}
+
   <div class="grid-4 mb-6" id="kpi-row">
-    ${kpis.map(k => UI.kpiCard(k.title, k.value, k.delta, k.dir, k.label, k.color)).join('')}
+    ${kpis.map(k => UI.statCardFresh(k.title, k.value, k.label, 'stats', k.delta, k.dir, k.color)).join('')}
   </div>
 
   <div class="grid-2-1 mb-4">
@@ -40,6 +43,7 @@ function renderDashboard() {
       <div class="card-header">
         <span class="card-title">At Risk Accounts</span>
         <span class="badge badge-red">${totalARR}M NOK</span>
+        ${typeof Auth !== 'undefined' && Auth.hasRole('manager') ? UI.exportDropdown({ id: 'atrisk', items: [{ label: 'CSV', icon: '\u229E', action: 'csv' }] }) : ''}
       </div>
       ${DATA.atRiskAccounts.map(a => UI.atRiskRow(a.company, a.arr, a.tickets, a.repeats, a.status)).join('')}
     </div>
@@ -71,12 +75,23 @@ dashRenderFn.afterRender = () => {
     // Re-render just the KPI row
     const kpis = DATA.dashboardKPIs[dashboardRange];
     document.getElementById('kpi-row').innerHTML =
-      kpis.map(k => UI.kpiCard(k.title, k.value, k.delta, k.dir, k.label, k.color)).join('');
+      kpis.map(k => UI.statCardFresh(k.title, k.value, k.label, 'stats', k.delta, k.dir, k.color)).join('');
   });
 
   // Attention row clicks
   document.querySelectorAll('.attention-row[data-page]').forEach(row => {
     row.addEventListener('click', () => Router.go(row.dataset.page));
+  });
+
+  // Export: At-Risk Accounts
+  UI.exportDropdownInit('atrisk', {
+    csv: () => UI.exportCSV(DATA.atRiskAccounts, [
+      { key: 'company', label: 'Company' },
+      { key: 'arr', label: 'ARR (NOK)' },
+      { key: 'tickets', label: 'Tickets' },
+      { key: 'repeats', label: 'Repeat Issues' },
+      { key: 'status', label: 'Health' },
+    ], 'at-risk-accounts'),
   });
 };
 

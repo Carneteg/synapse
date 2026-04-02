@@ -9,6 +9,8 @@ let intelTab = 'briefing';
 
 function renderBriefing() {
   return `
+    ${UI.sourceBar('briefing', 'AI Daily Briefing')}
+
     ${UI.insightCard('🔴', 'Urgent: API Rate Limiting Spike',
       '14 tickets tagged <strong>api-rate-limit</strong> opened in the past 24 hours — 3.1× the weekly average. Most are from enterprise accounts. Engineering has Jira issue JR-4401 open but unresolved. Recommend proactive outreach to affected accounts.')}
 
@@ -19,10 +21,10 @@ function renderBriefing() {
       'Acme Corp (NOK 3.2M ARR) has submitted 6 tickets this month, 2 flagged for churn signals. Average resolution time: 52h vs team average of 18h. Immediate escalation recommended.', 'warn')}
 
     <div class="grid-4 mt-4 mb-4">
-      ${UI.statCard('Avg QA Score', '78', 'Out of 100', '', '', 'var(--green)')}
-      ${UI.statCard('SLA Compliance', '84%', 'This week', '', '', 'var(--yellow)')}
-      ${UI.statCard('Open Tickets', '241', '12 overdue')}
-      ${UI.statCard('ARR at Risk', '4.8M', 'NOK — 7 flags', '', '', 'var(--red)')}
+      ${UI.statCardFresh('Avg QA Score', '78', 'Out of 100', 'qa', '', '', 'var(--green)')}
+      ${UI.statCardFresh('SLA Compliance', '84%', 'This week', 'stats', '', '', 'var(--yellow)')}
+      ${UI.statCardFresh('Open Tickets', '241', '12 overdue', 'tickets')}
+      ${UI.statCardFresh('ARR at Risk', '4.8M', 'NOK — 7 flags', 'companies', '', '', 'var(--red)')}
     </div>
 
     <div class="card">
@@ -40,7 +42,7 @@ function renderUrgent() {
     </div>
 
     <div class="card mb-4">
-      <div class="card-header"><span class="card-title">Priority Queue</span></div>
+      <div class="card-header"><span class="card-title">Priority Queue</span>${UI.tableExportBtn('pressing-table', 'urgent-tickets')}</div>
       ${UI.table({
         id: 'pressing-table',
         columns: [
@@ -92,7 +94,7 @@ function renderUrgent() {
 function renderAccounts() {
   return `
     <div class="card">
-      <div class="card-header"><span class="card-title">All Accounts — Health &amp; Quality</span></div>
+      <div class="card-header"><span class="card-title">All Accounts — Health &amp; Quality</span>${UI.tableExportBtn('accounts-table', 'accounts')}</div>
       ${UI.table({
         id: 'accounts-table',
         columns: [
@@ -216,6 +218,10 @@ intelRenderFn.afterRender = () => {
   // Init interactive tables
   UI.tableInit('pressing-table');
   UI.tableInit('accounts-table');
+
+  // Export buttons
+  UI.tableExportBtnInit('pressing-table', 'urgent-tickets', 'Priority Queue');
+  UI.tableExportBtnInit('accounts-table', 'accounts', 'Account Health');
 
   // "New Analysis" button (in section header)
   document.getElementById('new-analysis-btn')?.addEventListener('click', () => {

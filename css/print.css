@@ -1,0 +1,175 @@
+/**
+ * print.css — Print-optimized stylesheet
+ * Loaded with media="print" so it only applies when printing.
+ * Hides app chrome, reformats content for black-on-white paper.
+ */
+
+@page {
+  margin: 1.5cm;
+  size: A4 landscape;
+}
+
+/* ── HIDE APP CHROME ── */
+#sidebar,
+.topbar,
+#drilldown-overlay,
+#drilldown-panel,
+#session-toast,
+#login-screen,
+.export-dropdown,
+.stale-warning-action,
+.sync-btn,
+.nav-chevron,
+.back-btn { display: none !important; }
+
+/* ── RESET DARK THEME ── */
+:root {
+  --bg: #fff;
+  --surface: #fff;
+  --surface2: #f9f9f9;
+  --border: #ddd;
+  --text: #111;
+  --text-muted: #555;
+  --text-dim: #888;
+}
+
+body {
+  background: #fff !important;
+  color: #111 !important;
+  font-size: 11px;
+}
+
+#main {
+  margin-left: 0 !important;
+  padding: 0 !important;
+}
+
+.page {
+  padding: 0 !important;
+}
+
+/* ── PRINT HEADER ── */
+#page-container::before {
+  content: "Synapse Report — " attr(data-print-title) " — " attr(data-print-date);
+  display: block;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #111;
+  border-bottom: 2px solid #111;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+/* ── CARDS ── */
+.card {
+  border: 1px solid #ccc !important;
+  background: #fff !important;
+  break-inside: avoid;
+  box-shadow: none !important;
+  margin-bottom: 12px;
+}
+
+.card-header {
+  border-bottom: 1px solid #ddd !important;
+}
+
+.card-title {
+  color: #111 !important;
+}
+
+/* ── TABLES ── */
+.table {
+  border-collapse: collapse;
+}
+
+.table th {
+  color: #333 !important;
+  border-bottom: 2px solid #333 !important;
+  background: #f5f5f5 !important;
+  font-size: 10px;
+}
+
+.table td {
+  color: #111 !important;
+  border-bottom: 1px solid #ddd !important;
+  font-size: 10px;
+}
+
+.table-filter-row { display: none !important; }
+.table-pagination { display: none !important; }
+
+/* ── TYPOGRAPHY ── */
+.section-head h2 {
+  color: #111 !important;
+  font-size: 16px;
+}
+
+.section-head p {
+  color: #555 !important;
+}
+
+.stat-big {
+  color: #111 !important;
+}
+
+.stat-label,
+.stat-delta {
+  color: #555 !important;
+}
+
+/* ── BADGES ── */
+.badge {
+  border: 1px solid currentColor !important;
+  background: transparent !important;
+  color: #333 !important;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ── PROGRESS BARS ── */
+.progress-bar {
+  background: #eee !important;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.progress-fill {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ── BAR CHARTS ── */
+.bar-chart-bar {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ── FRESHNESS / SOURCE INDICATORS ── */
+.fresh-badge { color: #888 !important; }
+.source-bar {
+  background: #f5f5f5 !important;
+  border-left-color: #999 !important;
+  color: #555 !important;
+}
+.card-freshness { color: #888 !important; }
+.stale-warning { border-color: #ccc !important; background: #f9f9f9 !important; }
+
+/* ── GRIDS ── */
+.grid-4, .grid-3, .grid-2, .grid-2-1 {
+  gap: 8px !important;
+}
+
+/* ── AGENT CHIPS ── */
+.agent-avatar {
+  background: #ddd !important;
+  color: #333 !important;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ── HIDE INTERACTIVE ELEMENTS ── */
+.btn:not(.stale-warning-action) { display: none !important; }
+.toggle { display: none !important; }
+select { display: none !important; }
+input[type="range"] { display: none !important; }

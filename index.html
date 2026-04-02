@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/print.css" media="print">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 </head>
@@ -24,7 +25,10 @@
         <label class="login-label" for="login-email">Email</label>
         <input class="input" id="login-email" type="email" placeholder="you@company.com" required>
         <label class="login-label" for="login-password">Password</label>
-        <input class="input" id="login-password" type="password" placeholder="Enter password" required>
+        <div class="login-pass-wrap">
+          <input class="input" id="login-password" type="password" placeholder="Enter password" required>
+          <button type="button" class="login-pass-toggle" id="login-pass-toggle" tabindex="-1" title="Show password">⊙</button>
+        </div>
         <div id="login-error" class="login-error"></div>
         <button type="submit" class="btn btn-primary login-btn">Sign In</button>
       </form>
@@ -61,6 +65,7 @@
       <div class="nav-children">
         <div class="nav-child" data-page="qa-summary">Summary</div>
         <div class="nav-child" data-page="churn-risk">Churn Risk <span class="nav-badge">7</span></div>
+        <div class="nav-child" data-page="qa-coaching">Coaching</div>
       </div>
     </div>
 
@@ -96,6 +101,16 @@
         <div class="nav-child" data-page="stats-attachments">Attachments</div>
       </div>
     </div>
+
+    <!-- User block -->
+    <div class="sidebar-user" id="sidebar-user">
+      <div class="agent-avatar" id="sidebar-user-initials">AU</div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-name" id="sidebar-user-name">Admin User</span>
+        <span class="badge badge-purple" id="sidebar-user-role">Admin</span>
+      </div>
+      <button class="sidebar-logout-btn" id="sidebar-logout-btn" title="Sign out">&#9211;</button>
+    </div>
   </nav>
 
   <!-- MAIN -->
@@ -122,11 +137,18 @@
     <div class="drilldown-body" id="drilldown-body"></div>
   </div>
 
+  <!-- SESSION TOAST -->
+  <div class="session-toast" id="session-toast">
+    <span class="session-toast-text">Session expires in 2 min</span>
+    <a class="session-toast-action" id="session-toast-stay">Stay signed in</a>
+  </div>
+
   <script src="js/auth.js"></script>
   <script src="js/data.js"></script>
   <script src="js/api.js"></script>
   <script src="js/router.js"></script>
   <script src="js/components.js"></script>
+  <script src="js/export.js"></script>
   <script src="js/pages/dashboard.js"></script>
   <script src="js/pages/sync.js"></script>
   <script src="js/pages/documents.js"></script>
