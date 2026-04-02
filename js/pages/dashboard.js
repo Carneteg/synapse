@@ -18,7 +18,8 @@ function renderDashboard() {
         <option value="week"${dashboardRange === 'week' ? ' selected' : ''}>This Week</option>
         <option value="month"${dashboardRange === 'month' ? ' selected' : ''}>This Month</option>
       </select>
-    </div>`
+    </div>`,
+    'dashboardKPIs'
   )}
 
   <div class="grid-4 mb-6" id="kpi-row">

@@ -47,6 +47,29 @@ const TTL = {
   stats:          5 * 60,    // 5 min
 };
 
+// ── Source tagging middleware ──
+// Intercepts res.json() on /api/ routes to automatically add _source metadata.
+app.use('/api', (req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (body && typeof body === 'object' && !body.error) {
+      // Tag source based on _cached flag
+      if (body._cached === true && !body._source) {
+        body._source = 'cache';
+      } else if (body._cached === false && !body._source) {
+        body._source = 'freshdesk_api';
+        if (!body._fetched_at) body._fetched_at = new Date().toISOString();
+      }
+      // Mock data source when not configured
+      if (!freshdesk.isConfigured() && !body._source) {
+        body._source = 'mock';
+      }
+    }
+    return originalJson(body);
+  };
+  next();
+});
+
 // ── Structured error response helper ──
 function handleError(res, err, cacheKeyToRemove) {
   const status = err.status || 500;

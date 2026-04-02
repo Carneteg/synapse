@@ -5,6 +5,32 @@
 
 const UI = {
 
+  // ── SOURCE LABEL ──
+  // Renders a subtle data-origin badge.
+  // source: 'freshdesk_api' | 'cache' | 'ai_generated' | 'mock'
+  // fetchedAt: ISO timestamp string (optional)
+  sourceLabel(source, fetchedAt) {
+    if (!source) return '';
+    const labels = {
+      freshdesk_api: { text: 'Live from Freshdesk', cls: 'source-live' },
+      cache:         { text: '', cls: 'source-cache' }, // computed below
+      ai_generated:  { text: 'AI-generated', cls: 'source-ai' },
+      mock:          { text: 'Demo data', cls: 'source-mock' },
+    };
+    const info = labels[source] || { text: source, cls: 'source-mock' };
+    let text = info.text;
+
+    // For cache, show relative time
+    if (source === 'cache' && fetchedAt) {
+      const ago = Math.round((Date.now() - new Date(fetchedAt).getTime()) / 60000);
+      text = ago < 1 ? 'Cached — just now' : `Cached — ${ago} min ago`;
+    } else if (source === 'cache') {
+      text = 'Cached';
+    }
+
+    return `<span class="source-label ${info.cls}" title="${fetchedAt ? 'Fetched: ' + fetchedAt : ''}">${text}</span>`;
+  },
+
   // ── STAT CARD ──
   statCard(title, value, label, delta, deltaDir, color) {
     return `
@@ -17,11 +43,18 @@ const UI = {
   },
 
   // ── SECTION HEADER ──
-  sectionHead(title, sub, actionHtml = '') {
+  // dataKey: optional DATA key name — if provided and API is available,
+  // a source label (Live/Cached/Demo) will be shown next to the title.
+  sectionHead(title, sub, actionHtml = '', dataKey) {
+    let sourceHtml = '';
+    if (dataKey && typeof API !== 'undefined') {
+      const meta = API.getSourceMeta(dataKey);
+      if (meta) sourceHtml = UI.sourceLabel(meta.source, meta.fetchedAt);
+    }
     return `
       <div class="section-head">
         <div>
-          <h2>${title}</h2>
+          <h2>${title} ${sourceHtml}</h2>
           ${sub ? `<p>${sub}</p>` : ''}
         </div>
         ${actionHtml}

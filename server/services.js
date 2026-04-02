@@ -16,16 +16,31 @@ const TTL = {
 };
 
 /**
- * Cache-first helper. Returns cached data if fresh, otherwise calls fetchFn,
- * caches the result, and returns it.
+ * Cache-first helper. Tags every response with source metadata.
+ * Returns data + _source + _fetched_at + _cached.
  */
 async function cached(key, ttl, fetchFn) {
-  const hit = cache.get(key);
-  if (hit) return { ...hit, _cached: true };
+  const hit = cache.getWithMeta(key);
+  if (hit) {
+    return {
+      ...hit.data,
+      _source: 'cache',
+      _fetched_at: hit.meta.fetchedAt,
+      _cached_at: new Date(hit.meta.cachedAt).toISOString(),
+      _age_ms: hit.meta.ageMs,
+      _cached: true,
+    };
+  }
 
+  const fetchedAt = new Date().toISOString();
   const data = await fetchFn();
-  cache.set(key, data, ttl);
-  return { ...data, _cached: false };
+  cache.set(key, data, ttl, fetchedAt);
+  return {
+    ...data,
+    _source: 'freshdesk_api',
+    _fetched_at: fetchedAt,
+    _cached: false,
+  };
 }
 
 // ═════════════════════════════════════════════════════════════════════

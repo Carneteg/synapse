@@ -184,7 +184,8 @@ function renderIntelHub() {
 
   return `
     ${UI.sectionHead('Intelligence Hub', 'Unified intelligence across all sources',
-      intelTab === 'analyses' ? '<button class="btn btn-primary btn-sm" id="new-analysis-btn">+ New Analysis</button>' : ''
+      intelTab === 'analyses' ? '<button class="btn btn-primary btn-sm" id="new-analysis-btn">+ New Analysis</button>' : '',
+      'pressingStats'
     )}
 
     <div class="intel-tabs mb-4">

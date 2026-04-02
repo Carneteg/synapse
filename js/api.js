@@ -8,6 +8,7 @@ const API = (() => {
   let available = false;
   let domain = null;
   let lastError = null;
+  const sourceMeta = {}; // Track _source + _fetched_at per DATA key
 
   /**
    * Fetch from proxy with structured error handling.
@@ -73,13 +74,28 @@ const API = (() => {
    */
   function hydrate(liveData) {
     if (!liveData) return;
-    const skip = ['_cached', '_cacheKey', '_raw_count'];
+    const metaKeys = ['_cached', '_cacheKey', '_raw_count', '_source', '_fetched_at', '_cached_at', '_age_ms'];
+    const source = liveData._source || 'freshdesk_api';
+    const fetchedAt = liveData._fetched_at || null;
+
     for (const [key, value] of Object.entries(liveData)) {
-      if (skip.includes(key)) continue;
+      if (metaKeys.includes(key)) continue;
       if (DATA.hasOwnProperty(key)) {
         DATA[key] = value;
+        // Track source per DATA key
+        sourceMeta[key] = { source, fetchedAt };
       }
     }
+  }
+
+  /**
+   * Get source metadata for a DATA key.
+   * Returns { source, fetchedAt } or null.
+   */
+  function getSourceMeta(key) {
+    if (sourceMeta[key]) return sourceMeta[key];
+    if (!available) return { source: 'mock', fetchedAt: null };
+    return null;
   }
 
   /**
@@ -180,6 +196,7 @@ const API = (() => {
     get available() { return available; },
     get domain() { return domain; },
     get lastError() { return lastError; },
+    getSourceMeta,
     init,
     refreshAll,
     clearCacheAndRefresh,
