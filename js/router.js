@@ -11,7 +11,7 @@ const Router = (() => {
   // topbarAction: HTML string for action button, or '' for none
   const categories = {
     home:         { label: 'Home',         icon: '◈', default: 'dashboard',          topbarAction: '<button class="sync-btn" id="topbar-refresh-btn">⟳ Refresh</button>' },
-    intelligence: { label: 'Intelligence', icon: '◉', default: 'today',              topbarAction: '' },
+    intelligence: { label: 'Intelligence', icon: '◉', default: 'intel-hub',           topbarAction: '' },
     qa:           { label: 'QA',           icon: '▣', default: 'qa-summary',         topbarAction: '' },
     mastermind:   { label: 'Mastermind',   icon: '◌', default: 'mastermind-search',  topbarAction: '' },
     operations:   { label: 'Operations',   icon: '⟳', default: 'ar-dashboard',      topbarAction: '<button class="sync-btn" id="topbar-sync-btn">⟳ Sync Now</button>' },
@@ -20,13 +20,7 @@ const Router = (() => {
   // ── Page map: id → { title, hash, category, badges? } ──
   const pageMap = {
     'dashboard':           { title: 'Home',                   hash: '#/',                         category: 'home' },
-    'today':               { title: "Today's Insight",        hash: '#/intelligence',             category: 'intelligence' },
-    'intel-overview':      { title: 'Overview',               hash: '#/intelligence/overview',    category: 'intelligence' },
-    'trending':            { title: 'Trending Issues',        hash: '#/intelligence/trending',    category: 'intelligence' },
-    'pressing':            { title: 'Pressing Now',           hash: '#/intelligence/pressing',    category: 'intelligence' },
-    'health':              { title: 'Customer Health',        hash: '#/intelligence/health',      category: 'intelligence' },
-    'quality':             { title: 'Quality',                hash: '#/intelligence/quality',     category: 'intelligence' },
-    'analyses':            { title: 'AI Analyses',            hash: '#/intelligence/analyses',    category: 'intelligence' },
+    'intel-hub':           { title: 'Intelligence Hub',       hash: '#/intelligence',             category: 'intelligence' },
     'qa-summary':          { title: 'Summary',                hash: '#/qa',                       category: 'qa' },
     'churn-risk':          { title: 'Churn Risk',             hash: '#/qa/churn-risk',            category: 'qa' },
     'mastermind-search':   { title: 'Search',                 hash: '#/mastermind',               category: 'mastermind' },
@@ -150,6 +144,8 @@ const Router = (() => {
     // Try with trailing slash stripped
     const clean = hash.replace(/\/$/, '');
     if (hashToId[clean]) return hashToId[clean];
+    // Fallback: any #/intelligence/* route → intel-hub
+    if (clean.startsWith('#/intelligence')) return 'intel-hub';
     return 'dashboard';
   }
 

@@ -207,11 +207,28 @@ const DATA = {
   },
 
   attentionItems: [
-    { icon: '⚑', text: '12 SLA breaches need response',               badge: 'badge-red',    page: 'pressing' },
+    { icon: '⚑', text: '12 SLA breaches need response',               badge: 'badge-red',    page: 'intel-hub' },
     { icon: '△', text: '7 churn signals — 4.8M NOK at risk',          badge: 'badge-red',    page: 'churn-risk' },
     { icon: '⊟', text: '5 auto-response drafts awaiting review',       badge: 'badge-green',  page: 'ar-drafts' },
-    { icon: '⬆', text: 'API rate limit +250% this week',              badge: 'badge-yellow', page: 'trending' },
+    { icon: '⬆', text: 'API rate limit +250% this week',              badge: 'badge-yellow', page: 'intel-hub' },
     { icon: '◎', text: 'QA: Commercial Awareness scored 2.8 / 5',     badge: 'badge-yellow', page: 'qa-summary' },
+  ],
+
+  accountsUnified: [
+    { company: 'Acme Corp',        tickets: 18, resRate: '72%',  avgRes: '52h', repeats: 4, arr: '3.2M', sla: '68%', slaBadge: 'badge-red',    status: 'At Risk' },
+    { company: 'Stormcloud Ltd',   tickets: 24, resRate: '58%',  avgRes: '48h', repeats: 7, arr: '2.1M', sla: '74%', slaBadge: 'badge-yellow', status: 'At Risk' },
+    { company: 'Nordic Fintech AS',tickets: 6,  resRate: '100%', avgRes: '14h', repeats: 0, arr: '2.8M', sla: '97%', slaBadge: 'badge-green',  status: 'Healthy' },
+    { company: 'Borealis Systems', tickets: 3,  resRate: '100%', avgRes: '8h',  repeats: 0, arr: '1.6M', sla: '100%',slaBadge: 'badge-green',  status: 'Healthy' },
+    { company: 'DataPilot GmbH',   tickets: 11, resRate: '82%',  avgRes: '21h', repeats: 2, arr: '1.4M', sla: '82%', slaBadge: 'badge-yellow', status: 'Watch' },
+    { company: 'Vega Analytics',   tickets: 8,  resRate: '88%',  avgRes: '16h', repeats: 1, arr: '900K', sla: '90%', slaBadge: 'badge-green',  status: 'Watch' },
+    { company: 'Helio Retail AB',  tickets: 2,  resRate: '100%', avgRes: '6h',  repeats: 0, arr: '450K', sla: '100%',slaBadge: 'badge-green',  status: 'Healthy' },
+  ],
+
+  analysisScopes: [
+    { value: 'daily-briefing', label: 'Daily Briefing' },
+    { value: 'churn-analysis', label: 'Churn Analysis' },
+    { value: 'quality-report', label: 'Quality Report' },
+    { value: 'trending',       label: 'Trending Issues' },
   ],
 
   atRiskAccounts: [
