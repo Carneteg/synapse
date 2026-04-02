@@ -14,6 +14,7 @@ function renderDashboard() {
   ${UI.sectionHead('Home', 'What needs your attention today',
     `<div class="dash-controls">
       ${UI.freshBadge('stats')}
+      ${UI.fullReportBtn()}
       <select class="select" id="dash-range">
         <option value="today"${dashboardRange === 'today' ? ' selected' : ''}>Today</option>
         <option value="week"${dashboardRange === 'week' ? ' selected' : ''}>This Week</option>
@@ -93,6 +94,9 @@ dashRenderFn.afterRender = () => {
       { key: 'status', label: 'Health' },
     ], 'at-risk-accounts'),
   });
+
+  // Export: Full Report
+  UI.fullReportBtnInit('Synapse Dashboard');
 };
 
 Router.register('dashboard', dashRenderFn);

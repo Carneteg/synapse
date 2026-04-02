@@ -58,6 +58,14 @@ body {
   color: #111;
   border-bottom: 2px solid #111;
   padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+#page-container::after {
+  content: "Date Range: " attr(data-print-range);
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: #666;
   margin-bottom: 16px;
 }
 
