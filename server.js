@@ -731,6 +731,21 @@ app.post('/api/services/group-filter', requireConfig, express.json(), async (req
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// DATE RANGE FILTER
+// ─────────────────────────────────────────────────────────────────────
+
+app.get('/api/services/date-range', (req, res) => {
+  res.json(services.getDateRange());
+});
+
+app.post('/api/services/date-range', express.json(), (req, res) => {
+  const { from, to } = req.body || {};
+  services.setDateRange(from || null, to || null);
+  cache.clearAll();
+  res.json({ ok: true, from: from || null, to: to || null });
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // CACHE MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────
 

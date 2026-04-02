@@ -75,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btn) Router.go(btn.dataset.navigate);
     });
 
+    // ── DATE RANGE PICKER ──
+    initDateRangePicker();
+
     // ── ACTIVITY TRACKING (idle timeout) ──
     Auth.startActivityTracking();
 
@@ -137,6 +140,72 @@ document.addEventListener('DOMContentLoaded', () => {
     bootApp();
   } else {
     document.addEventListener('authSuccess', bootApp, { once: true });
+  }
+
+  // ═══════════════════════════════════════════
+  //  DATE RANGE PICKER
+  // ═══════════════════════════════════════════
+
+  function initDateRangePicker() {
+    const fromInput = document.getElementById('date-from');
+    const toInput   = document.getElementById('date-to');
+    const applyBtn  = document.getElementById('date-range-apply');
+    const clearBtn  = document.getElementById('date-range-clear');
+    if (!fromInput || !toInput || !applyBtn || !clearBtn) return;
+
+    // Restore from sessionStorage
+    const saved = DateRange.get();
+    if (saved.from) { fromInput.value = saved.from; fromInput.classList.add('date-range-active'); }
+    if (saved.to)   { toInput.value = saved.to; toInput.classList.add('date-range-active'); }
+    if (saved.from || saved.to) clearBtn.style.display = '';
+
+    // Set sensible defaults (last 30 days) if empty
+    if (!fromInput.value) {
+      const d = new Date(); d.setDate(d.getDate() - 30);
+      fromInput.value = d.toISOString().slice(0, 10);
+    }
+    if (!toInput.value) {
+      toInput.value = new Date().toISOString().slice(0, 10);
+    }
+
+    applyBtn.addEventListener('click', async () => {
+      const from = fromInput.value;
+      const to   = toInput.value;
+      if (!from || !to) return;
+      if (from > to) { fromInput.value = to; toInput.value = from; }
+      DateRange.set(fromInput.value, toInput.value);
+      fromInput.classList.add('date-range-active');
+      toInput.classList.add('date-range-active');
+      clearBtn.style.display = '';
+      // Push to server if API is available
+      if (typeof API !== 'undefined' && API.available) {
+        try {
+          await fetch('/api/services/date-range', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: DateRange.fromISO(), to: DateRange.toISO() }),
+          });
+        } catch {}
+      }
+      Router.go(Router.getInitialPage());
+    });
+
+    clearBtn.addEventListener('click', async () => {
+      DateRange.clear();
+      fromInput.value = '';
+      toInput.value = '';
+      fromInput.classList.remove('date-range-active');
+      toInput.classList.remove('date-range-active');
+      clearBtn.style.display = 'none';
+      if (typeof API !== 'undefined' && API.available) {
+        try {
+          await fetch('/api/services/date-range', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: null, to: null }),
+          });
+        } catch {}
+      }
+      Router.go(Router.getInitialPage());
+    });
   }
 
 });

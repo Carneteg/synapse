@@ -4,6 +4,39 @@
  * Each object corresponds to a page or feature area.
  */
 
+/**
+ * DateRange — global date range filter (sessionStorage-backed).
+ * Used by the topbar date picker and passed to API calls.
+ */
+const DateRange = {
+  _key: 'synapse_date_range',
+  get() {
+    try {
+      return JSON.parse(sessionStorage.getItem(this._key)) || { from: null, to: null };
+    } catch { return { from: null, to: null }; }
+  },
+  set(from, to) {
+    sessionStorage.setItem(this._key, JSON.stringify({ from, to }));
+  },
+  clear() {
+    sessionStorage.removeItem(this._key);
+  },
+  /** Returns ISO string for "from" date (start of day) or null. */
+  fromISO() {
+    const { from } = this.get();
+    return from ? new Date(from + 'T00:00:00').toISOString() : null;
+  },
+  /** Returns ISO string for "to" date (end of day) or null. */
+  toISO() {
+    const { to } = this.get();
+    return to ? new Date(to + 'T23:59:59').toISOString() : null;
+  },
+  isActive() {
+    const { from, to } = this.get();
+    return !!(from || to);
+  },
+};
+
 const DATA = {
 
   sources: [
