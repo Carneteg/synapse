@@ -187,11 +187,14 @@ const API = (() => {
 
     // Data services — each returns the service response or null
     getDashboardStats:      () => service('dashboard-stats'),
+    getDashboardComparison: () => service('dashboard-comparison'),
     getActionableInsights:  () => service('actionable-insights'),
+    getTodaysIssues:        () => service('todays-issues'),
     getTicketTrends:     (days) => service(`ticket-trends?days=${days || 30}`),
     getTopIssues:           () => service('top-issues'),
     getAgentPerformance:    () => service('agent-performance'),
     getGroupPerformance:    () => service('group-performance'),
+    getAgentList:           () => service('agent-list'),
     getCSATByAgent:         () => service('csat-by-agent'),
     getWorstScoredTickets:  () => service('worst-scored'),
     getDraftQueue:          () => service('draft-queue'),

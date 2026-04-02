@@ -88,6 +88,56 @@ async function getDashboardStats() {
 }
 
 /**
+ * getDashboardComparison()
+ * This week vs last week ticket stats for time comparison.
+ */
+async function getDashboardComparison() {
+  return cached('svc:dashboard-comparison', TTL.short, async () => {
+    const now = new Date();
+    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfLastWeek = new Date(startOfWeek); startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+    const tickets = await freshdesk.listTickets({
+      updated_since: startOfLastWeek.toISOString(),
+      include: 'stats',
+      order_by: 'created_at',
+      order_type: 'asc',
+    });
+
+    const thisWeek = { created: 0, resolved: 0, slaBreaches: 0, firstResponseTotal: 0, frCount: 0 };
+    const lastWeek = { created: 0, resolved: 0, slaBreaches: 0, firstResponseTotal: 0, frCount: 0 };
+
+    for (const t of tickets) {
+      const created = new Date(t.created_at);
+      const bucket = created >= startOfWeek ? thisWeek : lastWeek;
+
+      bucket.created++;
+      if (t.status === 4 || t.status === 5) bucket.resolved++;
+      if ((t.status === 2 || t.status === 3) && t.due_by && new Date(t.due_by) < now) bucket.slaBreaches++;
+      if (t.stats?.first_responded_at) {
+        bucket.firstResponseTotal += (new Date(t.stats.first_responded_at) - created) / 3600000;
+        bucket.frCount++;
+      }
+    }
+
+    const avgFR = (b) => b.frCount > 0 ? Math.round(b.firstResponseTotal / b.frCount * 10) / 10 : null;
+
+    const pctChange = (curr, prev) => prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null;
+
+    return {
+      thisWeek: { ...thisWeek, avgFirstResponseHours: avgFR(thisWeek) },
+      lastWeek: { ...lastWeek, avgFirstResponseHours: avgFR(lastWeek) },
+      changes: {
+        created: pctChange(thisWeek.created, lastWeek.created),
+        resolved: pctChange(thisWeek.resolved, lastWeek.resolved),
+        slaBreaches: pctChange(thisWeek.slaBreaches, lastWeek.slaBreaches),
+      },
+    };
+  });
+}
+
+/**
  * getActionableInsights()
  * Open tickets >24h, SLA at-risk, churn signals by company.
  */
@@ -167,6 +217,65 @@ async function getActionableInsights() {
 // ═════════════════════════════════════════════════════════════════════
 // INTELLIGENCE / TRENDING
 // ═════════════════════════════════════════════════════════════════════
+
+/**
+ * getTodaysIssues()
+ * Today's tickets aggregated by tag, type, and group.
+ */
+async function getTodaysIssues() {
+  return cached('svc:todays-issues', TTL.short, async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tickets = await freshdesk.listTickets({
+      updated_since: today.toISOString(),
+      include: 'stats',
+      order_by: 'created_at',
+      order_type: 'desc',
+    });
+
+    const byTag = {};
+    const byType = {};
+    const byGroup = {};
+    const byPriority = { urgent: 0, high: 0, medium: 0, low: 0 };
+
+    for (const t of tickets) {
+      for (const tag of (t.tags || [])) {
+        byTag[tag] = (byTag[tag] || 0) + 1;
+      }
+      const type = t.type || 'Unclassified';
+      byType[type] = (byType[type] || 0) + 1;
+      const gid = t.group_id || 'Unassigned';
+      byGroup[gid] = (byGroup[gid] || 0) + 1;
+      if (t.priority === 4) byPriority.urgent++;
+      else if (t.priority === 3) byPriority.high++;
+      else if (t.priority === 2) byPriority.medium++;
+      else byPriority.low++;
+    }
+
+    // Resolve group names
+    let groupNames = {};
+    try {
+      const groups = await freshdesk.listGroups();
+      for (const g of groups) groupNames[g.id] = g.name;
+    } catch { /* skip */ }
+
+    const topTags = Object.entries(byTag).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([tag, count]) => ({ tag, count }));
+    const topTypes = Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([type, count]) => ({ type, count }));
+    const topGroups = Object.entries(byGroup).sort((a, b) => b[1] - a[1]).map(([gid, count]) => ({
+      group_id: gid,
+      group_name: groupNames[gid] || (gid === 'Unassigned' ? 'Unassigned' : `Group #${gid}`),
+      count,
+    }));
+
+    return {
+      total: tickets.length,
+      byPriority,
+      topTags,
+      topTypes,
+      topGroups,
+    };
+  });
+}
 
 /**
  * getTicketTrends(days)
@@ -305,6 +414,39 @@ async function getGroupPerformance() {
     })).sort((a, b) => b.resolved - a.resolved);
 
     return { groups: performance };
+  });
+}
+
+/**
+ * getAgentList()
+ * Full agent list with group names and availability status.
+ */
+async function getAgentList() {
+  return cached('svc:agent-list', TTL.long, async () => {
+    const [agents, groups] = await Promise.all([
+      freshdesk.listAgents(),
+      freshdesk.listGroups(),
+    ]);
+
+    const groupNames = {};
+    for (const g of groups) groupNames[g.id] = g.name;
+
+    const result = agents
+      .filter(a => a.contact?.name)
+      .map(a => ({
+        id: a.id,
+        name: a.contact.name,
+        email: a.contact.email,
+        available: a.available || false,
+        occasional: a.occasional || false,
+        active: a.active !== false,
+        scope: a.ticket_scope,
+        scope_label: { 1: 'Global', 2: 'Group', 3: 'Restricted' }[a.ticket_scope] || 'Unknown',
+        groups: (a.group_ids || []).map(gid => ({ id: gid, name: groupNames[gid] || `Group #${gid}` })),
+        role_ids: a.role_ids || [],
+      }));
+
+    return { agents: result, count: result.length };
   });
 }
 
@@ -597,9 +739,9 @@ async function getAgentTickets(agentId) {
 
 module.exports = {
   // Dashboard
-  getDashboardStats, getActionableInsights,
+  getDashboardStats, getDashboardComparison, getActionableInsights,
   // Intelligence / Trending
-  getTicketTrends, getTopIssues, getAgentPerformance, getGroupPerformance,
+  getTodaysIssues, getTicketTrends, getTopIssues, getAgentPerformance, getGroupPerformance, getAgentList,
   // QA
   getCSATByAgent, getWorstScoredTickets,
   // Auto-Responder

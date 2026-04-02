@@ -655,13 +655,16 @@ function svcRoute(fn) {
 
 // Dashboard
 app.get('/api/services/dashboard-stats',      requireConfig, svcRoute(() => services.getDashboardStats()));
+app.get('/api/services/dashboard-comparison', requireConfig, svcRoute(() => services.getDashboardComparison()));
 app.get('/api/services/actionable-insights',  requireConfig, svcRoute(() => services.getActionableInsights()));
 
 // Intelligence / Trending
+app.get('/api/services/todays-issues',        requireConfig, svcRoute(() => services.getTodaysIssues()));
 app.get('/api/services/ticket-trends',        requireConfig, svcRoute(req => services.getTicketTrends(parseInt(req.query.days) || 30)));
 app.get('/api/services/top-issues',           requireConfig, svcRoute(() => services.getTopIssues()));
 app.get('/api/services/agent-performance',    requireConfig, svcRoute(() => services.getAgentPerformance()));
 app.get('/api/services/group-performance',    requireConfig, svcRoute(() => services.getGroupPerformance()));
+app.get('/api/services/agent-list',           requireConfig, svcRoute(() => services.getAgentList()));
 
 // QA
 app.get('/api/services/csat-by-agent',        requireConfig, svcRoute(() => services.getCSATByAgent()));
@@ -749,11 +752,14 @@ app.listen(PORT, () => {
   console.log('    GET  /api/freshdesk/status');
   console.log('  Data Services:');
   console.log('    GET  /api/services/dashboard-stats');
+  console.log('    GET  /api/services/dashboard-comparison');
   console.log('    GET  /api/services/actionable-insights');
+  console.log('    GET  /api/services/todays-issues');
   console.log('    GET  /api/services/ticket-trends[?days=30]');
   console.log('    GET  /api/services/top-issues');
   console.log('    GET  /api/services/agent-performance');
   console.log('    GET  /api/services/group-performance');
+  console.log('    GET  /api/services/agent-list');
   console.log('    GET  /api/services/csat-by-agent');
   console.log('    GET  /api/services/worst-scored');
   console.log('    GET  /api/services/draft-queue');
