@@ -1,70 +1,164 @@
 /**
- * router.js — Client-side page routing
- * Pages register themselves via Router.register(id, renderFn).
- * Navigate with Router.go(id).
+ * router.js — Client-side hash-based routing with category support.
+ * Pages register via Router.register(id, renderFn).
+ * Navigate with Router.go(id). URLs update automatically.
  */
 
 const Router = (() => {
   const registry = {};
 
-  const pageMap = {
-    'dashboard':           { title: 'Dashboard',              tag: '/' },
-    'sync':                { title: 'Data Sync',              tag: '/sync' },
-    'documents':           { title: 'Documents',              tag: '/documents' },
-    'today':               { title: "Today's Insight",        tag: '/intelligence/today' },
-    'intel-overview':      { title: 'Intelligence Overview',  tag: '/intelligence' },
-    'trending':            { title: 'Trending Issues',        tag: '/intelligence/trending' },
-    'pressing':            { title: 'Pressing Now',           tag: '/intelligence/pressing' },
-    'health':              { title: 'Customer Health',        tag: '/intelligence/health' },
-    'quality':             { title: 'Quality Assurance',      tag: '/intelligence/quality' },
-    'analyses':            { title: 'AI Analyses',            tag: '/intelligence/analyses' },
-    'qa-summary':          { title: 'QA Summary',             tag: '/intelligence/qa-summary' },
-    'churn-risk':          { title: 'Churn Risk',             tag: '/intelligence/churn-risk' },
-    'mastermind-search':   { title: 'Mastermind Search',      tag: '/mastermind' },
-    'mastermind-chat':     { title: 'Mastermind Chat',        tag: '/mastermind/chat' },
-    'mastermind-articles': { title: 'Articles',               tag: '/mastermind/articles' },
-    'mastermind-agents':   { title: 'Agents',                 tag: '/mastermind/agents' },
-    'mastermind-settings': { title: 'Mastermind Settings',    tag: '/mastermind/settings' },
-    'ar-dashboard':        { title: 'Auto-Responder',         tag: '/auto-responder' },
-    'ar-drafts':           { title: 'Draft Queue',            tag: '/auto-responder/drafts' },
-    'ar-config':           { title: 'Configuration',          tag: '/auto-responder/config' },
-    'stats-freshdesk':     { title: 'Freshdesk Analytics',    tag: '/stats/freshdesk' },
-    'stats-jira':          { title: 'Jira Analytics',         tag: '/stats/jira' },
-    'stats-attachments':   { title: 'Attachment Analytics',   tag: '/stats/attachments' },
+  // ── Category definitions ──
+  const categories = {
+    home:         { label: 'Home',         icon: '◈', default: 'dashboard' },
+    intelligence: { label: 'Intelligence', icon: '◉', default: 'today' },
+    qa:           { label: 'QA',           icon: '▣', default: 'qa-summary' },
+    mastermind:   { label: 'Mastermind',   icon: '◌', default: 'mastermind-search' },
+    operations:   { label: 'Operations',   icon: '⟳', default: 'ar-dashboard' },
   };
+
+  // ── Page map: id → { title, hash, category, badges? } ──
+  const pageMap = {
+    'dashboard':           { title: 'Home',                   hash: '#/',                         category: 'home' },
+    'today':               { title: "Today's Insight",        hash: '#/intelligence',             category: 'intelligence' },
+    'intel-overview':      { title: 'Overview',               hash: '#/intelligence/overview',    category: 'intelligence' },
+    'trending':            { title: 'Trending Issues',        hash: '#/intelligence/trending',    category: 'intelligence' },
+    'pressing':            { title: 'Pressing Now',           hash: '#/intelligence/pressing',    category: 'intelligence' },
+    'health':              { title: 'Customer Health',        hash: '#/intelligence/health',      category: 'intelligence' },
+    'quality':             { title: 'Quality',                hash: '#/intelligence/quality',     category: 'intelligence' },
+    'analyses':            { title: 'AI Analyses',            hash: '#/intelligence/analyses',    category: 'intelligence' },
+    'qa-summary':          { title: 'Summary',                hash: '#/qa',                       category: 'qa' },
+    'churn-risk':          { title: 'Churn Risk',             hash: '#/qa/churn-risk',            category: 'qa' },
+    'mastermind-search':   { title: 'Search',                 hash: '#/mastermind',               category: 'mastermind' },
+    'mastermind-chat':     { title: 'Chat',                   hash: '#/mastermind/chat',          category: 'mastermind' },
+    'mastermind-articles': { title: 'Articles',               hash: '#/mastermind/articles',      category: 'mastermind' },
+    'mastermind-agents':   { title: 'Agents',                 hash: '#/mastermind/agents',        category: 'mastermind' },
+    'ar-dashboard':        { title: 'Auto-Responder',         hash: '#/operations',               category: 'operations' },
+    'ar-drafts':           { title: 'Draft Queue',            hash: '#/operations/drafts',        category: 'operations' },
+    'ar-config':           { title: 'Configuration',          hash: '#/operations/config',        category: 'operations' },
+    'mastermind-settings': { title: 'Pipeline Settings',      hash: '#/operations/pipeline',      category: 'operations' },
+    'sync':                { title: 'Data Sync',              hash: '#/operations/sync',          category: 'operations' },
+    'documents':           { title: 'Documents',              hash: '#/operations/documents',     category: 'operations' },
+    'stats-freshdesk':     { title: 'Freshdesk',              hash: '#/operations/freshdesk',     category: 'operations' },
+    'stats-jira':          { title: 'Jira',                   hash: '#/operations/jira',          category: 'operations' },
+    'stats-attachments':   { title: 'Attachments',            hash: '#/operations/attachments',   category: 'operations' },
+  };
+
+  // ── Reverse lookup: hash → pageId ──
+  const hashToId = {};
+  for (const [id, info] of Object.entries(pageMap)) {
+    hashToId[info.hash] = id;
+  }
+
+  // ── Internal state ──
+  let currentId = null;
+  let updatingHash = false;
 
   function register(id, renderFn) {
     registry[id] = renderFn;
   }
 
-  function go(id) {
-    const container = document.getElementById('page-container');
-    const renderFn  = registry[id];
+  function go(id, opts = {}) {
+    const renderFn = registry[id];
     if (!renderFn) { console.warn('No page registered for:', id); return; }
 
+    currentId = id;
+    const info = pageMap[id] || { title: id, hash: '#/', category: 'home' };
+
+    // Update hash without triggering hashchange loop
+    if (!opts._fromHash && location.hash !== info.hash) {
+      updatingHash = true;
+      location.hash = info.hash;
+      updatingHash = false;
+    }
+
     // Render page
+    const container = document.getElementById('page-container');
     const div = document.createElement('div');
     div.className = 'page';
     div.innerHTML = renderFn();
     container.innerHTML = '';
     container.appendChild(div);
-
-    // After DOM is in place, run any post-render hooks
     if (renderFn.afterRender) renderFn.afterRender();
 
-    // Update topbar
-    const info = pageMap[id] || { title: id, tag: '/' };
-    document.getElementById('topbar-title').textContent = info.title;
-    document.getElementById('topbar-tag').textContent   = info.tag;
+    // Update topbar breadcrumb
+    updateBreadcrumb(id, info);
 
-    // Update nav active state
-    document.querySelectorAll('.nav-item').forEach(n => {
-      n.classList.toggle('active', n.dataset.page === id);
-    });
+    // Update sidebar active state
+    updateSidebar(id, info);
 
     // Dispatch event so pages can attach listeners after render
     document.dispatchEvent(new CustomEvent('pageRendered', { detail: { id } }));
   }
 
-  return { register, go };
+  function updateBreadcrumb(id, info) {
+    const bc = document.getElementById('breadcrumb');
+    const backBtn = document.getElementById('back-btn');
+    if (!bc) return;
+
+    if (info.category === 'home') {
+      bc.innerHTML = '<span class="breadcrumb-current">Home</span>';
+      if (backBtn) backBtn.style.display = 'none';
+    } else {
+      const cat = categories[info.category];
+      const catDefault = cat.default;
+      bc.innerHTML =
+        `<a class="breadcrumb-link" data-page="${catDefault}">${cat.label}</a>` +
+        `<span class="breadcrumb-sep">/</span>` +
+        `<span class="breadcrumb-current">${info.title}</span>`;
+      if (backBtn) backBtn.style.display = '';
+    }
+  }
+
+  function updateSidebar(id, info) {
+    // Highlight active nav item
+    document.querySelectorAll('.nav-child').forEach(n => {
+      n.classList.toggle('active', n.dataset.page === id);
+    });
+
+    // Expand active category, collapse others
+    document.querySelectorAll('.nav-group').forEach(g => {
+      const isCurrent = g.dataset.category === info.category;
+      g.classList.toggle('expanded', isCurrent);
+    });
+
+    // Highlight active category header
+    document.querySelectorAll('.nav-group-header').forEach(h => {
+      h.classList.toggle('active', h.closest('.nav-group')?.dataset.category === info.category);
+    });
+  }
+
+  function resolveHash(hash) {
+    if (!hash || hash === '#' || hash === '#/') return 'dashboard';
+    // Exact match
+    if (hashToId[hash]) return hashToId[hash];
+    // Try with trailing slash stripped
+    const clean = hash.replace(/\/$/, '');
+    if (hashToId[clean]) return hashToId[clean];
+    return 'dashboard';
+  }
+
+  function initHashListener() {
+    window.addEventListener('hashchange', () => {
+      if (updatingHash) return;
+      const id = resolveHash(location.hash);
+      if (id !== currentId) go(id, { _fromHash: true });
+    });
+  }
+
+  function getInitialPage() {
+    return resolveHash(location.hash);
+  }
+
+  function getCategoryForPage(id) {
+    return pageMap[id]?.category || 'home';
+  }
+
+  function getCategoryDefault(cat) {
+    return categories[cat]?.default || 'dashboard';
+  }
+
+  return {
+    register, go, initHashListener, getInitialPage,
+    categories, pageMap, getCategoryForPage, getCategoryDefault
+  };
 })();

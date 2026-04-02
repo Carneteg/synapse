@@ -38,58 +38,83 @@
       <span class="logo-text">Synapse</span>
     </div>
 
-    <div class="nav-section">
-      <div class="nav-item active" data-page="dashboard"><span class="nav-icon">◈</span> Dashboard</div>
-      <div class="nav-item" data-page="sync"><span class="nav-icon">⟳</span> Data Sync</div>
-      <div class="nav-item" data-page="documents"><span class="nav-icon">⊟</span> Documents</div>
+    <!-- Home (no children) -->
+    <div class="nav-group" data-category="home">
+      <div class="nav-group-header" data-page="dashboard">
+        <span class="nav-icon">◈</span> Home
+      </div>
     </div>
 
-    <div class="nav-section">
-      <div class="nav-label">Intelligence</div>
-      <div class="nav-item" data-page="today"><span class="nav-icon">◉</span> Today's Insight</div>
-      <div class="nav-item" data-page="intel-overview"><span class="nav-icon">◫</span> Overview</div>
-      <div class="nav-item" data-page="trending"><span class="nav-icon">⬆</span> Trending Issues <span class="nav-badge yellow">3</span></div>
-      <div class="nav-item" data-page="pressing"><span class="nav-icon">⚑</span> Pressing Now <span class="nav-badge">12</span></div>
-      <div class="nav-item" data-page="health"><span class="nav-icon">♡</span> Customer Health</div>
-      <div class="nav-item" data-page="quality"><span class="nav-icon">◎</span> Quality Assurance</div>
-      <div class="nav-item" data-page="analyses"><span class="nav-icon">⊕</span> AI Analyses</div>
+    <!-- Intelligence -->
+    <div class="nav-group" data-category="intelligence">
+      <div class="nav-group-header">
+        <span class="nav-icon">◉</span> Intelligence
+        <span class="nav-chevron">›</span>
+      </div>
+      <div class="nav-children">
+        <div class="nav-child" data-page="today">Today's Insight</div>
+        <div class="nav-child" data-page="intel-overview">Overview</div>
+        <div class="nav-child" data-page="trending">Trending Issues <span class="nav-badge yellow">3</span></div>
+        <div class="nav-child" data-page="pressing">Pressing Now <span class="nav-badge">12</span></div>
+        <div class="nav-child" data-page="health">Customer Health</div>
+        <div class="nav-child" data-page="quality">Quality</div>
+        <div class="nav-child" data-page="analyses">AI Analyses</div>
+      </div>
     </div>
 
-    <div class="nav-section">
-      <div class="nav-label">QA Scoring</div>
-      <div class="nav-item" data-page="qa-summary"><span class="nav-icon">▣</span> QA Summary</div>
-      <div class="nav-item" data-page="churn-risk"><span class="nav-icon">△</span> Churn Risk <span class="nav-badge">7</span></div>
+    <!-- QA -->
+    <div class="nav-group" data-category="qa">
+      <div class="nav-group-header">
+        <span class="nav-icon">▣</span> QA
+        <span class="nav-chevron">›</span>
+      </div>
+      <div class="nav-children">
+        <div class="nav-child" data-page="qa-summary">Summary</div>
+        <div class="nav-child" data-page="churn-risk">Churn Risk <span class="nav-badge">7</span></div>
+      </div>
     </div>
 
-    <div class="nav-section">
-      <div class="nav-label">Mastermind</div>
-      <div class="nav-item" data-page="mastermind-search"><span class="nav-icon">◌</span> Search</div>
-      <div class="nav-item" data-page="mastermind-chat"><span class="nav-icon">◻</span> Chat</div>
-      <div class="nav-item" data-page="mastermind-articles"><span class="nav-icon">⊞</span> Articles</div>
-      <div class="nav-item" data-page="mastermind-agents"><span class="nav-icon">⊙</span> Agents</div>
-      <div class="nav-item" data-page="mastermind-settings"><span class="nav-icon">⚙</span> Settings</div>
+    <!-- Mastermind -->
+    <div class="nav-group" data-category="mastermind">
+      <div class="nav-group-header">
+        <span class="nav-icon">◌</span> Mastermind
+        <span class="nav-chevron">›</span>
+      </div>
+      <div class="nav-children">
+        <div class="nav-child" data-page="mastermind-search">Search</div>
+        <div class="nav-child" data-page="mastermind-chat">Chat</div>
+        <div class="nav-child" data-page="mastermind-articles">Articles</div>
+        <div class="nav-child" data-page="mastermind-agents">Agents</div>
+      </div>
     </div>
 
-    <div class="nav-section">
-      <div class="nav-label">Auto-Responder</div>
-      <div class="nav-item" data-page="ar-dashboard"><span class="nav-icon">◈</span> Dashboard</div>
-      <div class="nav-item" data-page="ar-drafts"><span class="nav-icon">⊟</span> Draft Queue <span class="nav-badge green">5</span></div>
-      <div class="nav-item" data-page="ar-config"><span class="nav-icon">⊞</span> Configuration</div>
-    </div>
-
-    <div class="nav-section">
-      <div class="nav-label">Analytics</div>
-      <div class="nav-item" data-page="stats-freshdesk"><span class="nav-icon">◫</span> Freshdesk</div>
-      <div class="nav-item" data-page="stats-jira"><span class="nav-icon">◎</span> Jira</div>
-      <div class="nav-item" data-page="stats-attachments"><span class="nav-icon">⊕</span> Attachments</div>
+    <!-- Operations -->
+    <div class="nav-group" data-category="operations">
+      <div class="nav-group-header">
+        <span class="nav-icon">⟳</span> Operations
+        <span class="nav-chevron">›</span>
+      </div>
+      <div class="nav-children">
+        <div class="nav-child" data-page="ar-dashboard">Auto-Responder</div>
+        <div class="nav-child" data-page="ar-drafts">Draft Queue <span class="nav-badge green">5</span></div>
+        <div class="nav-child" data-page="ar-config">Configuration</div>
+        <div class="nav-child" data-page="mastermind-settings">Pipeline Settings</div>
+        <div class="nav-child" data-page="sync">Data Sync</div>
+        <div class="nav-child" data-page="documents">Documents</div>
+        <div class="nav-child" data-page="stats-freshdesk">Freshdesk</div>
+        <div class="nav-child" data-page="stats-jira">Jira</div>
+        <div class="nav-child" data-page="stats-attachments">Attachments</div>
+      </div>
     </div>
   </nav>
 
   <!-- MAIN -->
   <main id="main">
     <div class="topbar">
-      <span class="topbar-title" id="topbar-title">Dashboard</span>
-      <span class="topbar-tag" id="topbar-tag">/</span>
+      <button class="back-btn" id="back-btn" style="display:none">←</button>
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="breadcrumb-current">Home</span>
+      </div>
       <button class="sync-btn" id="topbar-sync-btn">⟳ Sync Now</button>
     </div>
     <div id="page-container"></div>
