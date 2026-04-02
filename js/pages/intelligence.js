@@ -41,21 +41,21 @@ function renderUrgent() {
 
     <div class="card mb-4">
       <div class="card-header"><span class="card-title">Priority Queue</span></div>
-      <table class="table">
-        <thead><tr><th>Ticket</th><th>Subject</th><th>Priority</th><th>Age</th><th>SLA</th><th>ARR</th></tr></thead>
-        <tbody>
-          ${DATA.pressingTickets.map(t => `
-            <tr>
-              <td class="mono">${t.id}</td>
-              <td>${t.title}</td>
-              <td>${UI.priorityBadge(t.priority)}</td>
-              <td>${t.age}</td>
-              <td>${UI.slaBadge(t.sla)}</td>
-              <td class="mono" style="color:${t.arr !== '—' ? 'var(--green)' : 'var(--text-muted)'}">${t.arr}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      ${UI.table({
+        id: 'pressing-table',
+        columns: [
+          { key: 'id',       label: 'Ticket',   render: r => `<span class="mono">${r.id}</span>` },
+          { key: 'title',    label: 'Subject',   sortable: true },
+          { key: 'priority', label: 'Priority',  render: r => UI.priorityBadge(r.priority), sortable: true },
+          { key: 'age',      label: 'Age',       sortable: true },
+          { key: 'sla',      label: 'SLA',       render: r => UI.slaBadge(r.sla) },
+          { key: 'arr',      label: 'ARR',       render: r => `<span class="mono" style="color:${r.arr !== '—' ? 'var(--green)' : 'var(--text-muted)'}">${r.arr}</span>` },
+        ],
+        data: DATA.pressingTickets,
+        pageSize: 0,
+        filterable: false,
+        onRowClick: row => DrillDown.open('ticket', row),
+      })}
     </div>
 
     <div class="divider"></div>
@@ -93,28 +93,23 @@ function renderAccounts() {
   return `
     <div class="card">
       <div class="card-header"><span class="card-title">All Accounts — Health &amp; Quality</span></div>
-      <table class="table">
-        <thead>
-          <tr><th>Company</th><th>Tickets (30d)</th><th>Resolution Rate</th><th>Avg Resolution</th><th>Repeat Issues</th><th>ARR (NOK)</th><th>SLA</th><th>Health</th></tr>
-        </thead>
-        <tbody>
-          ${DATA.accountsUnified.map(a => `
-            <tr>
-              <td style="font-weight:500">${a.company}</td>
-              <td>${a.tickets}</td>
-              <td>${a.resRate}</td>
-              <td style="color:${parseInt(a.avgRes) > 24 ? 'var(--red)' : 'inherit'}">${a.avgRes}</td>
-              <td>${a.repeats > 0
-                ? `<span style="color:${a.repeats >= 4 ? 'var(--red)' : 'var(--yellow)'}">● ${a.repeats}</span>`
-                : '0'
-              }</td>
-              <td class="mono" style="color:var(--green)">${a.arr}</td>
-              <td>${UI.badge(a.sla, a.slaBadge)}</td>
-              <td>${UI.healthBadge(a.status)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      ${UI.table({
+        id: 'accounts-table',
+        columns: [
+          { key: 'company',  label: 'Company',         sortable: true, render: r => `<span style="font-weight:500">${r.company}</span>` },
+          { key: 'tickets',  label: 'Tickets (30d)',    sortable: true, type: 'number' },
+          { key: 'resRate',  label: 'Resolution Rate',  sortable: true },
+          { key: 'avgRes',   label: 'Avg Resolution',   sortable: true, render: r => `<span style="color:${parseInt(r.avgRes) > 24 ? 'var(--red)' : 'inherit'}">${r.avgRes}</span>` },
+          { key: 'repeats',  label: 'Repeat Issues',    sortable: true, type: 'number', render: r => r.repeats > 0 ? `<span style="color:${r.repeats >= 4 ? 'var(--red)' : 'var(--yellow)'}">● ${r.repeats}</span>` : '0' },
+          { key: 'arr',      label: 'ARR (NOK)',        sortable: true, render: r => `<span class="mono" style="color:var(--green)">${r.arr}</span>` },
+          { key: 'sla',      label: 'SLA',              sortable: true, render: r => UI.badge(r.sla, r.slaBadge) },
+          { key: 'status',   label: 'Health',           sortable: true, render: r => UI.healthBadge(r.status) },
+        ],
+        data: DATA.accountsUnified,
+        pageSize: 10,
+        filterable: true,
+        onRowClick: row => DrillDown.open('company', row),
+      })}
     </div>`;
 }
 
@@ -217,6 +212,10 @@ intelRenderFn.afterRender = () => {
       }
     });
   });
+
+  // Init interactive tables
+  UI.tableInit('pressing-table');
+  UI.tableInit('accounts-table');
 
   // "New Analysis" button (in section header)
   document.getElementById('new-analysis-btn')?.addEventListener('click', () => {

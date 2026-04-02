@@ -1,5 +1,5 @@
 // ── QA SUMMARY ──
-Router.register('qa-summary', () => `
+const qaSummaryFn = () => `
   ${UI.sectionHead('QA Summary', 'AI-scored conversation quality',
     `<button class="btn btn-primary">▶ New Run</button>`)}
 
@@ -18,19 +18,18 @@ Router.register('qa-summary', () => `
 
     <div class="card">
       <div class="card-header"><span class="card-title">Agent Leaderboard</span></div>
-      <table class="table">
-        <thead><tr><th>Agent</th><th>Tickets</th><th>Avg Score</th><th>Flags</th></tr></thead>
-        <tbody>
-          ${DATA.qaAgents.map(a => `
-            <tr>
-              <td>${UI.agentChip(a.initials, a.name)}</td>
-              <td>${a.tickets}</td>
-              <td class="mono" style="color:${UI.scoreColor(a.score)}">${a.score}</td>
-              <td>${a.flags}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      ${UI.table({
+        id: 'qa-agents-table',
+        columns: [
+          { key: 'name',    label: 'Agent',     render: r => UI.agentChip(r.initials, r.name) },
+          { key: 'tickets', label: 'Tickets',   sortable: true, type: 'number' },
+          { key: 'score',   label: 'Avg Score',  sortable: true, type: 'number', render: r => `<span class="mono" style="color:${UI.scoreColor(r.score)}">${r.score}</span>` },
+          { key: 'flags',   label: 'Flags',     sortable: true, type: 'number' },
+        ],
+        data: DATA.qaAgents,
+        pageSize: 0,
+        filterable: false,
+      })}
       <div class="divider"></div>
       <div style="font-size:12px;color:var(--text-muted);line-height:1.8">
         <strong style="color:var(--yellow)">Stop:</strong> Deflecting ownership on integration issues<br>
@@ -39,32 +38,35 @@ Router.register('qa-summary', () => `
       </div>
     </div>
   </div>
-`);
+`;
+
+qaSummaryFn.afterRender = () => {
+  UI.tableInit('qa-agents-table');
+};
+
+Router.register('qa-summary', qaSummaryFn);
 
 // ── CHURN RISK ──
-Router.register('churn-risk', () => `
+const churnRiskFn = () => `
   ${UI.sectionHead('Churn Risk', 'Tickets with detected cancellation signals')}
 
   <div class="grid-2-1">
     <div class="card">
-      <div class="card-header">
-        <span class="card-title">Flagged Tickets</span>
-        <button class="btn btn-ghost btn-sm">Filter</button>
-      </div>
-      <table class="table">
-        <thead><tr><th>Ticket</th><th>Company</th><th>Score</th><th>CSAT Est.</th><th>Signal</th></tr></thead>
-        <tbody>
-          ${DATA.churnTickets.map(t => `
-            <tr>
-              <td class="mono">${t.id}</td>
-              <td>${t.company}</td>
-              <td class="mono" style="color:${UI.scoreColor(t.score)}">${t.score}</td>
-              <td>⭐ ${t.csat}</td>
-              <td style="color:var(--text-muted);font-size:12px">${t.signal}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <div class="card-header"><span class="card-title">Flagged Tickets</span></div>
+      ${UI.table({
+        id: 'churn-table',
+        columns: [
+          { key: 'id',      label: 'Ticket',  render: r => `<span class="mono">${r.id}</span>` },
+          { key: 'company', label: 'Company', sortable: true },
+          { key: 'score',   label: 'Score',   sortable: true, type: 'number', render: r => `<span class="mono" style="color:${UI.scoreColor(r.score)}">${r.score}</span>` },
+          { key: 'csat',    label: 'CSAT Est.', render: r => `⭐ ${r.csat}` },
+          { key: 'signal',  label: 'Signal',  render: r => `<span style="color:var(--text-muted);font-size:12px">${r.signal}</span>` },
+        ],
+        data: DATA.churnTickets,
+        pageSize: 0,
+        filterable: false,
+        onRowClick: row => DrillDown.open('ticket', { id: row.id, title: row.signal, priority: 'High', sla: 'At Risk', age: '—', arr: '—' }),
+      })}
     </div>
 
     <div class="card">
@@ -84,4 +86,10 @@ Router.register('churn-risk', () => `
       </div>
     </div>
   </div>
-`);
+`;
+
+churnRiskFn.afterRender = () => {
+  UI.tableInit('churn-table');
+};
+
+Router.register('churn-risk', churnRiskFn);

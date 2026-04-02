@@ -111,6 +111,17 @@
     <div id="page-container"></div>
   </main>
 
+  <!-- DRILL-DOWN PANEL -->
+  <div id="drilldown-overlay" class="drilldown-overlay"></div>
+  <div id="drilldown-panel" class="drilldown-panel">
+    <div class="drilldown-topbar">
+      <button class="dd-back-btn" id="drilldown-back" style="display:none">←</button>
+      <span style="flex:1"></span>
+      <button class="dd-close-btn" id="drilldown-close">×</button>
+    </div>
+    <div class="drilldown-body" id="drilldown-body"></div>
+  </div>
+
   <script src="js/auth.js"></script>
   <script src="js/data.js"></script>
   <script src="js/api.js"></script>
@@ -124,6 +135,7 @@
   <script src="js/pages/mastermind.js"></script>
   <script src="js/pages/autoresponder.js"></script>
   <script src="js/pages/analytics.js"></script>
+  <script src="js/drilldown.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
